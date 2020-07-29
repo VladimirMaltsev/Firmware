@@ -1346,6 +1346,22 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 				if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
 					mavlink_log_critical(&_mavlink_log_pub, "Launch detection running");
 					_launch_detection_notify = hrt_absolute_time();
+
+					const int setAirspeed = 1;
+					const float flightThrMax = 1.0f;
+					const float flightThrMin = 0.1f;
+					const float flightMinAirspeed = 20.f;
+					const float flightTrimAirspeed = 22.f;
+					const float flightMaxAirspeed = 30.f;
+
+					param_set(param_find("FW_ARSP_MODE"), &setAirspeed);
+					param_set(param_find("FW_THR_MAX"), &flightThrMax);
+					param_set(param_find("FW_THR_MIN"), &flightThrMin);
+					param_set(param_find("FW_AIRSPD_MIN"), &flightMinAirspeed);
+					param_set(param_find("FW_AIRSPD_MAX"), &flightMaxAirspeed);
+					param_set(param_find("FW_AIRSPD_TRIM"), &flightTrimAirspeed);
+
+					mavlink_log_critical(&_mavlink_log_pub, "fixing Airspeed");
 				}
 
 				/* Detect launch using body X (forward) acceleration */
@@ -1367,6 +1383,29 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 			_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
 			_att_sp.roll_body = _l1_control.get_roll_setpoint();
 			_att_sp.yaw_body = _l1_control.nav_bearing();
+
+			if (!airspeedEnabled) {
+				if (airspeedTimerCounter == 0) {
+					mavlink_log_critical(&_mavlink_log_pub, "Airspeed will become active after 2 seconds");
+				}
+				if (airspeedTimerCounter < 100) {                // 50 = 1 second
+					airspeedTimerCounter++;
+				} else {
+					const int setAirspeedMode = 0;
+					param_set(param_find("FW_ARSP_MODE"), &setAirspeedMode);
+					mavlink_log_critical(&_mavlink_log_pub, "Turn on airspeed");
+
+					int test = -1;
+					param_get(_parameter_handles.airspeed_disabled, &test);
+
+					airspeedEnabled = true;
+					if (test == 0) {
+						mavlink_log_critical(&_mavlink_log_pub, "Airspeed now active");
+					} else {
+						mavlink_log_critical(&_mavlink_log_pub, "Airspeed activation failed");
+					}
+				}
+			}
 
 			/* Select throttle: only in LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS we want to use
 			 * full throttle, otherwise we use idle throttle */
