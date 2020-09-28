@@ -30,7 +30,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-
+#include <uORB/topics/actuator_controls.h>
+#include <modules/px4iofirmware/protocol.h>
+#include <modules/px4iofirmware/px4io.h>
+#include <uORB/topics/landing_gear.h>
 #include "FixedwingPositionControl.hpp"
 
 extern "C" __EXPORT int fw_pos_control_l1_main(int argc, char *argv[]);
@@ -718,7 +721,7 @@ FixedwingPositionControl::get_terrain_altitude_takeoff(float takeoff_alt,
 }
 
 bool
-FixedwingPositionControl::update_desired_altitude(float dt)
+FixedwingPositionControl::update_desired_altitude(float dt_p)
 {
 	/*
 	 * The complete range is -1..+1, so this is 6%
@@ -756,13 +759,13 @@ FixedwingPositionControl::update_desired_altitude(float dt)
 	if (_manual.x > deadBand) {
 		/* pitching down */
 		float pitch = -(_manual.x - deadBand) / factor;
-		_hold_alt += (_parameters.max_sink_rate * dt) * pitch;
+		_hold_alt += (_parameters.max_sink_rate * dt_p) * pitch;
 		_was_in_deadband = false;
 
 	} else if (_manual.x < - deadBand) {
 		/* pitching up */
 		float pitch = -(_manual.x + deadBand) / factor;
-		_hold_alt += (_parameters.max_climb_rate * dt) * pitch;
+		_hold_alt += (_parameters.max_climb_rate * dt_p) * pitch;
 		_was_in_deadband = false;
 		climbout_mode = (pitch > MANUAL_THROTTLE_CLIMBOUT_THRESH);
 
@@ -813,15 +816,15 @@ bool
 FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vector2f &ground_speed,
 		const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr, const position_setpoint_s &pos_sp_next)
 {
-	float dt = 0.01f;
+	float dt_p = 0.01f;
 
 	if (_control_position_last_called > 0) {
-		dt = hrt_elapsed_time(&_control_position_last_called) * 1e-6f;
+        dt_p = hrt_elapsed_time(&_control_position_last_called) * 1e-6f;
 	}
 
 	_control_position_last_called = hrt_absolute_time();
 
-	_l1_control.set_dt(dt);
+	_l1_control.set_dt(dt_p);
 
 	/* only run position controller in fixed-wing mode and during transitions for VTOL */
 	if (_vehicle_status.is_rotary_wing && !_vehicle_status.in_transition_mode) {
@@ -1045,7 +1048,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		float altctrl_airspeed = get_demanded_airspeed();
 
 		/* update desired altitude based on user pitch stick input */
-		bool climbout_requested = update_desired_altitude(dt);
+		bool climbout_requested = update_desired_altitude(dt_p);
 
 		// if we assume that user is taking off then help by demanding altitude setpoint well above ground
 		// and set limit to pitch angle to prevent steering into ground
@@ -1147,7 +1150,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		float altctrl_airspeed = get_demanded_airspeed();
 
 		/* update desired altitude based on user pitch stick input */
-		bool climbout_requested = update_desired_altitude(dt);
+		bool climbout_requested = update_desired_altitude(dt_p);
 
 		// if we assume that user is taking off then help by demanding altitude setpoint well above ground
 		// and set limit to pitch angle to prevent steering into ground
@@ -1879,10 +1882,10 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 		bool climbout_mode, float climbout_pitch_min_rad,
 		uint8_t mode)
 {
-	float dt = 0.01f; // prevent division with 0
+	float dt_p = 0.01f; // prevent division with 0
 
 	if (_last_tecs_update > 0) {
-		dt = hrt_elapsed_time(&_last_tecs_update) * 1e-6;
+        dt_p = hrt_elapsed_time(&_last_tecs_update) * 1e-6;
 	}
 
 	_last_tecs_update = hrt_absolute_time();
@@ -1914,7 +1917,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 
 		} else if (_was_in_transition) {
 			// after transition we ramp up desired airspeed from the speed we had coming out of the transition
-			_asp_after_transition += dt * 2; // increase 2m/s
+			_asp_after_transition += dt_p * 2; // increase 2m/s
 
 			if (_asp_after_transition < airspeed_sp && _airspeed < airspeed_sp) {
 				airspeed_sp = max(_asp_after_transition, _airspeed);
