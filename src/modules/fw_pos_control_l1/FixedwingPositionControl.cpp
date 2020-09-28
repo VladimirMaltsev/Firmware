@@ -1004,9 +1004,11 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 						   radians(_parameters.pitch_limit_min));
 
 		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_LAND) {
-			control_landing(curr_pos, ground_speed, pos_sp_prev, pos_sp_curr);
+            float wp_distance = get_distance_to_next_waypoint((double) curr_pos(0), (double) curr_pos(1), (double) curr_wp(0),
+                                                              (double) curr_wp(1));
+            control_landing(curr_pos, ground_speed, pos_sp_prev, pos_sp_curr, wp_distance);
 
-		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF) {
+        } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF) {
 			control_takeoff(curr_pos, ground_speed, pos_sp_prev, pos_sp_curr);
 		}
 
@@ -1382,271 +1384,153 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
 void
 FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector2f &ground_speed,
-		const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
-{
-	/* current waypoint (the one currently heading for) */
-	Vector2f curr_wp((float)pos_sp_curr.lat, (float)pos_sp_curr.lon);
-	Vector2f prev_wp{0.0f, 0.0f}; /* previous waypoint */
+                                          const position_setpoint_s &pos_sp_prev,
+                                          const position_setpoint_s &pos_sp_curr, float wp_distance) {
 
-	if (pos_sp_prev.valid) {
-		prev_wp(0) = (float)pos_sp_prev.lat;
-		prev_wp(1) = (float)pos_sp_prev.lon;
+    const float airspeed_land = _parameters.airspeed_min;
 
-	} else {
-		/*
-		 * No valid previous waypoint, go for the current wp.
-		 * This is automatically handled by the L1 library.
-		 */
-		prev_wp(0) = (float)pos_sp_curr.lat;
-		prev_wp(1) = (float)pos_sp_curr.lon;
-	}
+    float throttle_land = 0.f;
+    float throttle_max = 0.f;
+    float throttle_min = 0.f;
 
-	// apply full flaps for landings. this flag will also trigger the use of flaperons
-	// if they have been enabled using the corresponding parameter
-	_att_sp.apply_flaps = vehicle_attitude_setpoint_s::FLAPS_LAND;
+    if (wp_distance > 80.f){
+        throttle_land = _parameters.throttle_cruise;
+        throttle_max = _parameters.throttle_max;
+        throttle_min = _parameters.throttle_min;
+    } else if (wp_distance > 50.f) {
+        throttle_land = _parameters.throttle_min;
+        throttle_max = _parameters.throttle_min;
+        throttle_min = _parameters.throttle_min;
+    } else if (wp_distance > 20.f) {
+        _land_motor_lim = true;
+        throttle_land = 0.f;
+        throttle_max = 0.f;
+        throttle_min = 0.f;
+    } else {
 
-	// Enable tighter throttle control for landings
-	_tecs.set_time_const_throt(_parameters.land_throtTC_scale * _parameters.time_const_throt);
+        if (!parachute_released){
+            if (_parameters.sys_autostart == 3239) {
+                act1.control[5] = 0.65f;
+            }
+            if (_parameters.sys_autostart == 2101) {
+                act1.control[5] = -0.97f; //parachute drop
+                act1.control[6] = 0.15f; //buffer drop
+            }
 
-	// save time at which we started landing and reset abort_landing
-	if (_time_started_landing == 0) {
-		reset_landing_state();
-		_time_started_landing = hrt_absolute_time();
-	}
+            act1.timestamp = hrt_absolute_time();
+            if (act_pub1 != nullptr) {
+                orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+            } else {
+                act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+            }
+            mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+        }
 
-	const float bearing_airplane_currwp = get_bearing_to_next_waypoint((double)curr_pos(0), (double)curr_pos(1),
-					      (double)curr_wp(0), (double)curr_wp(1));
+        parachute_released = true;
 
-	float bearing_lastwp_currwp = bearing_airplane_currwp;
+    }
+    if (parachute_released){
+        throttle_land = 0.f;
+        throttle_max = 0.f;
+        throttle_min = 0.f;
+    }
 
-	if (pos_sp_prev.valid) {
-		bearing_lastwp_currwp = get_bearing_to_next_waypoint((double)prev_wp(0), (double)prev_wp(1), (double)curr_wp(0),
-					(double)curr_wp(1));
-	}
+    if (!parachute_dropped && _vehicle_land_detected.landed) {
+        int sys_autostart = 0;
+        param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
 
-	/* Horizontal landing control */
-	/* switch to heading hold for the last meters, continue heading hold after */
-	float wp_distance = get_distance_to_next_waypoint((double)curr_pos(0), (double)curr_pos(1), (double)curr_wp(0),
-			    (double)curr_wp(1));
+        if (sys_autostart == 3239){
+            act1.control[5] = 0.92f;
+        } else if (sys_autostart == 2101) {
+            act1.control[7] = 1.0f;
+            act1.control[6] = 0.0;
+        } else {
+            mavlink_log_critical(&_mavlink_log_pub, "Unsupported airframe");
+        }
+        act1.timestamp = hrt_absolute_time();
+        if (act_pub1 != nullptr) {
+            orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+        } else {
+            act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+        }
+        mavlink_log_critical(&_mavlink_log_pub, "Parachute is dropped");
+        parachute_dropped = true;
 
-	/* calculate a waypoint distance value which is 0 when the aircraft is behind the waypoint */
-	float wp_distance_save = wp_distance;
+        //-SET-MODE-START-----------------------------
+        vehicle_command_s vcmd_mode = {};
+        vcmd_mode.timestamp = hrt_absolute_time();
+        /* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
+        vcmd_mode.param1 = 29;
+        vcmd_mode.param2 = 4;
+        vcmd_mode.param3 = 3;
+        vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
+        vcmd_mode.target_system = 1;
+        vcmd_mode.target_component = 1;
+        vcmd_mode.source_system = 255;
+        vcmd_mode.source_component = 0;
+        vcmd_mode.confirmation = 0;
+        vcmd_mode.from_external = true;
 
-	if (fabsf(wrap_pi(bearing_airplane_currwp - bearing_lastwp_currwp)) >= radians(90.0f)) {
-		wp_distance_save = 0.0f;
-	}
+        orb_advert_t _cmd_pub_mode{nullptr};
+        if (_cmd_pub_mode == nullptr) {
+            _cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
+            orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
+        } else {
+            orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
+        }
+        //-SET-MODE-END-----------------------------
 
-	// create virtual waypoint which is on the desired flight path but
-	// some distance behind landing waypoint. This will make sure that the plane
-	// will always follow the desired flight path even if we get close or past
-	// the landing waypoint
-	if (pos_sp_prev.valid) {
-		double lat = pos_sp_curr.lat;
-		double lon = pos_sp_curr.lon;
+        vehicle_command_s vcmd_disarm = {};
+        vcmd_disarm.timestamp = hrt_absolute_time();
+        vcmd_disarm.param1 = 0;
+        vcmd_disarm.param2 = 0;
+        vcmd_disarm.param3 = 0;
+        vcmd_disarm.param4 = 0;
+        vcmd_disarm.param5 = 0;
+        vcmd_disarm.param6 = 0;
+        vcmd_disarm.param7 = 0;
+        vcmd_disarm.command = 400;
+        vcmd_disarm.target_system = 1;
+        vcmd_disarm.target_component = 1;
+        vcmd_disarm.source_system = 255;
+        vcmd_disarm.source_component = 0;
+        vcmd_disarm.confirmation = 0;
+        vcmd_disarm.from_external = true;
 
-		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
-						   pos_sp_prev.lat, pos_sp_prev.lon, -1000.0f, &lat, &lon);
+        orb_advert_t _cmd_pub1{nullptr};
+        if (_cmd_pub1 == nullptr) {
+            _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
 
-		curr_wp(0) = (float)lat;
-		curr_wp(1) = (float)lon;
-	}
+            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+        } else {
+            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+        }
 
-	// we want the plane to keep tracking the desired flight path until we start flaring
-	// if we go into heading hold mode earlier then we risk to be pushed away from the runway by cross winds
-	if ((_parameters.land_heading_hold_horizontal_distance > 0.0f) && !_land_noreturn_horizontal &&
-	    ((wp_distance < _parameters.land_heading_hold_horizontal_distance) || _land_noreturn_vertical)) {
+//        tune_control_s tc = {};
+//        tc.tune_id = 8;
+//        tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
+//        tc.tune_override = 0;
+//        tc.timestamp = hrt_absolute_time();
+//
+//        orb_advert_t tune_control_pub = nullptr;
+//        if (tune_control_pub != nullptr) {
+//            orb_publish(ORB_ID(tune_control), tune_control_pub, &tc);
+//        } else {
+//            tune_control_pub = orb_advertise(ORB_ID(tune_control), &tc);
+//        }
+    }
 
-		if (pos_sp_prev.valid) {
-			/* heading hold, along the line connecting this and the last waypoint */
-			_target_bearing = bearing_lastwp_currwp;
-
-		} else {
-			_target_bearing = _yaw;
-		}
-
-		_land_noreturn_horizontal = true;
-		mavlink_log_info(&_mavlink_log_pub, "Landing, heading hold");
-	}
-
-	if (_land_noreturn_horizontal) {
-		// heading hold
-		_l1_control.navigate_heading(_target_bearing, _yaw, ground_speed);
-
-	} else {
-		// normal navigation
-		_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
-	}
-
-	_att_sp.roll_body = _l1_control.get_roll_setpoint();
-	_att_sp.yaw_body = _l1_control.nav_bearing();
-
-	if (_land_noreturn_horizontal) {
-		/* limit roll motion to prevent wings from touching the ground first */
-		_att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
-	}
-
-	/* Vertical landing control */
-	/* apply minimum pitch (flare) and limit roll if close to touch down, altitude error is negative (going down) */
-
-	// default to no terrain estimation, just use landing waypoint altitude
-	float terrain_alt = pos_sp_curr.alt;
-
-	if (_parameters.land_use_terrain_estimate == 1) {
-		if (_global_pos.terrain_alt_valid) {
-			// all good, have valid terrain altitude
-			terrain_alt = _global_pos.terrain_alt;
-			_t_alt_prev_valid = terrain_alt;
-			_time_last_t_alt = hrt_absolute_time();
-
-		} else if (_time_last_t_alt == 0) {
-			// we have started landing phase but don't have valid terrain
-			// wait for some time, maybe we will soon get a valid estimate
-			// until then just use the altitude of the landing waypoint
-			if (hrt_elapsed_time(&_time_started_landing) < 10_s) {
-				terrain_alt = pos_sp_curr.alt;
-
-			} else {
-				// still no valid terrain, abort landing
-				terrain_alt = pos_sp_curr.alt;
-				abort_landing(true);
-			}
-
-		} else if ((!_global_pos.terrain_alt_valid && hrt_elapsed_time(&_time_last_t_alt) < T_ALT_TIMEOUT)
-			   || _land_noreturn_vertical) {
-			// use previous terrain estimate for some time and hope to recover
-			// if we are already flaring (land_noreturn_vertical) then just
-			//  go with the old estimate
-			terrain_alt = _t_alt_prev_valid;
-
-		} else {
-			// terrain alt was not valid for long time, abort landing
-			terrain_alt = _t_alt_prev_valid;
-			abort_landing(true);
-		}
-	}
-
-	/* Check if we should start flaring with a vertical and a
-	 * horizontal limit (with some tolerance)
-	 * The horizontal limit is only applied when we are in front of the wp
-	 */
-	if ((_global_pos.alt < terrain_alt + _landingslope.flare_relative_alt()) ||
-	    _land_noreturn_vertical) {  //checking for land_noreturn to avoid unwanted climb out
-
-		/* land with minimal speed */
-
-		/* force TECS to only control speed with pitch, altitude is only implicitly controlled now */
-		// _tecs.set_speed_weight(2.0f);
-
-		/* kill the throttle if param requests it */
-		float throttle_max = _parameters.throttle_max;
-
-		/* enable direct yaw control using rudder/wheel */
-		if (_land_noreturn_horizontal) {
-			_att_sp.yaw_body = _target_bearing;
-			_att_sp.fw_control_yaw = true;
-		}
-
-		if (((_global_pos.alt < terrain_alt + _landingslope.motor_lim_relative_alt()) &&
-		     (wp_distance_save < _landingslope.flare_length() + 5.0f)) || // Only kill throttle when close to WP
-		    _land_motor_lim) {
-			throttle_max = min(throttle_max, _parameters.throttle_land_max);
-
-			if (!_land_motor_lim) {
-				_land_motor_lim  = true;
-				mavlink_log_info(&_mavlink_log_pub, "Landing, limiting throttle");
-			}
-		}
-
-		float flare_curve_alt_rel = _landingslope.getFlareCurveRelativeAltitudeSave(wp_distance, bearing_lastwp_currwp,
-					    bearing_airplane_currwp);
-
-		/* avoid climbout */
-		if ((_flare_curve_alt_rel_last < flare_curve_alt_rel && _land_noreturn_vertical) || _land_stayonground) {
-			flare_curve_alt_rel = 0.0f; // stay on ground
-			_land_stayonground = true;
-		}
-
-		const float airspeed_land = _parameters.land_airspeed_scale * _parameters.airspeed_min;
-		const float throttle_land = _parameters.throttle_min + (_parameters.throttle_max - _parameters.throttle_min) * 0.1f;
-
-		tecs_update_pitch_throttle(terrain_alt + flare_curve_alt_rel,
-					   calculate_target_airspeed(airspeed_land),
-					   radians(_parameters.land_flare_pitch_min_deg),
-					   radians(_parameters.land_flare_pitch_max_deg),
-					   0.0f,
-					   throttle_max,
-					   throttle_land,
-					   false,
-					   _land_motor_lim ? radians(_parameters.land_flare_pitch_min_deg) : radians(_parameters.pitch_limit_min),
-					   _land_motor_lim ? tecs_status_s::TECS_MODE_LAND_THROTTLELIM : tecs_status_s::TECS_MODE_LAND);
-
-		if (!_land_noreturn_vertical) {
-			// just started with the flaring phase
-			_flare_pitch_sp = 0.0f;
-			_flare_height = _global_pos.alt - terrain_alt;
-			mavlink_log_info(&_mavlink_log_pub, "Landing, flaring");
-			_land_noreturn_vertical = true;
-
-		} else {
-			if (_global_pos.vel_d > 0.1f) {
-				_flare_pitch_sp = radians(_parameters.land_flare_pitch_min_deg) *
-						  constrain((_flare_height - (_global_pos.alt - terrain_alt)) / _flare_height, 0.0f, 1.0f);
-			}
-
-			// otherwise continue using previous _flare_pitch_sp
-		}
-
-		_att_sp.pitch_body = _flare_pitch_sp;
-		_flare_curve_alt_rel_last = flare_curve_alt_rel;
-
-	} else {
-
-		/* intersect glide slope:
-		 * minimize speed to approach speed
-		 * if current position is higher than the slope follow the glide slope (sink to the
-		 * glide slope)
-		 * also if the system captures the slope it should stay
-		 * on the slope (bool land_onslope)
-		 * if current position is below the slope continue at previous wp altitude
-		 * until the intersection with slope
-		 * */
-
-		float altitude_desired = terrain_alt;
-
-		const float landing_slope_alt_rel_desired = _landingslope.getLandingSlopeRelativeAltitudeSave(wp_distance,
-				bearing_lastwp_currwp, bearing_airplane_currwp);
-
-		if (_global_pos.alt > terrain_alt + landing_slope_alt_rel_desired || _land_onslope) {
-			/* stay on slope */
-			altitude_desired = terrain_alt + landing_slope_alt_rel_desired;
-
-			if (!_land_onslope) {
-				mavlink_log_info(&_mavlink_log_pub, "Landing, on slope");
-				_land_onslope = true;
-			}
-
-		} else {
-			/* continue horizontally */
-			if (pos_sp_prev.valid) {
-				altitude_desired = pos_sp_prev.alt;
-
-			} else {
-				altitude_desired = _global_pos.alt;
-			}
-		}
-
-		const float airspeed_approach = _parameters.land_airspeed_scale * _parameters.airspeed_min;
-
-		tecs_update_pitch_throttle(altitude_desired,
-					   calculate_target_airspeed(airspeed_approach),
-					   radians(_parameters.pitch_limit_min),
-					   radians(_parameters.pitch_limit_max),
-					   _parameters.throttle_min,
-					   _parameters.throttle_max,
-					   _parameters.throttle_cruise,
-					   false,
-					   radians(_parameters.pitch_limit_min));
-	}
+    tecs_update_pitch_throttle(pos_sp_curr.alt,
+                               airspeed_land,
+                               radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
+                               radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
+                               throttle_min,
+                               throttle_max,
+                               throttle_land,
+                               false,
+                               radians(_parameters.pitch_limit_min),
+                               _land_motor_lim ? tecs_status_s::TECS_MODE_LAND_THROTTLELIM
+                                               : tecs_status_s::TECS_MODE_LAND);
 }
 
 float

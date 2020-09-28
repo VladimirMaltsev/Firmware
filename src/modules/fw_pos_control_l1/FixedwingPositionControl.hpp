@@ -484,7 +484,7 @@ private:
     void		control_takeoff(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
                                 const position_setpoint_s &pos_sp_curr);
     void		control_landing(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
-                                const position_setpoint_s &pos_sp_curr);
+                                const position_setpoint_s &pos_sp_curr, float wp_distance);
     float		get_tecs_pitch();
     float		get_tecs_thrust();
 
