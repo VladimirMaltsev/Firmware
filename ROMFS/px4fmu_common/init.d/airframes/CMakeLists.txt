@@ -42,6 +42,7 @@ px4_add_romfs_files(
 	
 	# [2000, 2999] Standard planes"
 	2100_standard_plane
+	2101_canard_diam
 	2105_maja
 	2106_albatross
 	2200_mini_talon
@@ -57,6 +58,7 @@ px4_add_romfs_files(
 	3036_pigeon
 	3037_parrot_disco_mod
 	3100_tbs_caipirinha
+	3239_generic_wing_diam
 
 	# [4000, 4999] Quadrotor x"
 	4001_quad_x

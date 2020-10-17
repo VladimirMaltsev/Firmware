@@ -1,15 +1,15 @@
 #!/bin/sh
 #
-# @name Generic Flying Wing
+# @name Generic Flying Wing DIAM
 #
 # @type Flying Wing
 # @class Plane
 #
 # @output MAIN1 left aileron
 # @output MAIN2 right aileron
-# @output MAIN3 rudder
+# @output MAIN3 spoilers
 # @output MAIN4 throttle
-# @output MAIN5 flaps
+#
 #
 # @output AUX1 feed-through of RC AUX1 channel
 # @output AUX2 feed-through of RC AUX2 channel
@@ -19,5 +19,4 @@
 #
 
 sh /etc/init.d/rc.fw_defaults
-
-set MIXER fw_generic_wing
+set MIXER fw_generic_wing_diam
