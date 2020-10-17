@@ -130,6 +130,7 @@ SDP3X::collect()
 	if (ret != PX4_OK) {
 		init_sdp3x();
 		perf_count(_comms_errors);
+		PX4_ERR("reinit sdp3x");
 		return ret;
 	}
 
