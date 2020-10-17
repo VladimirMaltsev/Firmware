@@ -42,6 +42,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdio.h>
+
+#include <unistd.h>
+#include <stdio.h>
+#include <poll.h>
 
 #include <uORB/uORB.h>
 #include <uORB/uORBTopics.h>
@@ -50,6 +55,8 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_command_ack.h>
+#include <uORB/topics/camera_capture.h>
+#include <uORB/topics/camera_log_file.h>
 
 #include <drivers/drv_hrt.h>
 #include <px4_getopt.h>
@@ -618,7 +625,6 @@ void Logger::add_default_topics()
 	add_topic("actuator_controls_1", 100);
 	add_topic("actuator_outputs", 100);
 	add_topic("airspeed", 200);
-	add_topic("adc_report", 200);
 	add_topic("battery_status", 500);
 	add_topic("camera_capture");
 	add_topic("camera_trigger");
@@ -659,8 +665,6 @@ void Logger::add_default_topics()
 	add_topic("vehicle_status_flags");
 	add_topic("vtol_vehicle_status", 200);
 	add_topic("wind_estimate", 200);
-	add_topic("stg_status");
-
 
 #ifdef CONFIG_ARCH_BOARD_PX4_SITL
 	add_topic("actuator_controls_virtual_fw");
@@ -927,6 +931,7 @@ void Logger::run()
 	int vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	uORB::Subscription<parameter_update_s> parameter_update_sub(ORB_ID(parameter_update));
 	int log_message_sub = orb_subscribe(ORB_ID(log_message));
+	int camera_sub = orb_subscribe(ORB_ID(camera_capture));
 	orb_set_interval(log_message_sub, 20);
 
 	// mission log topics if enabled (must be added first)
@@ -1011,6 +1016,7 @@ void Logger::run()
 	// the case where we wait with logging until vehicle is armed is handled below
 	if (_log_on_start) {
 		start_log_file(LogType::Full);
+		start_log_file(LogType::Mission);
 	}
 
 	/* init the update timer */
@@ -1047,6 +1053,8 @@ void Logger::run()
 	// check for new subscription data
 	hrt_abstime next_subscribe_check = 0;
 	int next_subscribe_topic_index = -1; // this is used to distribute the checks over time
+
+
 
 	while (!should_exit()) {
 
@@ -1134,24 +1142,40 @@ void Logger::run()
 							data_written = true;
 						}
 
-						// mission log
-						if (sub_idx < _num_mission_subs) {
-							if (_writer.is_started(LogType::Mission)) {
-								if (_mission_subscriptions[sub_idx].next_write_time < (loop_time / 100000)) {
-									unsigned delta_time = _mission_subscriptions[sub_idx].min_delta_ms;
-									if (delta_time > 0) {
-										_mission_subscriptions[sub_idx].next_write_time = (loop_time / 100000) + delta_time / 100;
-									}
-									if (write_message(LogType::Mission, _msg_buffer, msg_size)) {
-										data_written = true;
-									}
-								}
-							}
-						}
+						// // mission log
+						// if (sub_idx < _num_mission_subs) {
+						// 	if (_writer.is_started(LogType::Mission)) {
+						// 		if (_mission_subscriptions[sub_idx].next_write_time < (loop_time / 100000)) {
+						// 			unsigned delta_time = _mission_subscriptions[sub_idx].min_delta_ms;
+						// 			if (delta_time > 0) {
+						// 				_mission_subscriptions[sub_idx].next_write_time = (loop_time / 100000) + delta_time / 100;
+						// 			}
+						// 			if (write_message(LogType::Mission, _msg_buffer, msg_size)) {
+						// 				data_written = true;
+						// 			}
+						// 		}
+						// 	}
+						// }
 					}
 				}
 
 				++sub_idx;
+			}
+
+			//check for new camera_capture_message(s)
+			bool camera_updated = false;
+			ret = orb_check(camera_sub, &camera_updated);
+			if (ret == 0 && camera_updated){
+				camera_capture_s cam_cap;
+				orb_copy(ORB_ID(camera_capture), camera_sub, &cam_cap);
+				char message[256];
+				int ret_s = snprintf(message, 256, "%d %.4f %.4f %.4f %.4f %.16f %.16f %llu \n",
+								cam_cap.seq, cam_cap.q[0], cam_cap.q[1], cam_cap.q[2],
+								cam_cap.alt, cam_cap.lat, cam_cap.lon,cam_cap.timestamp_utc);
+
+				mavlink_log_info(&_mavlink_log_pub, "s=%d %s", ret_s, message);
+				//_writer.write_message_straightforward(LogType::Mission, message, ret_s);
+				write_message(LogType::Mission, message, ret_s);
 			}
 
 			//check for new logging message(s)
@@ -1255,6 +1279,7 @@ void Logger::run()
 			while (px4_sem_wait(&timer_callback_data.semaphore) != 0);
 		}
 	}
+
 
 	stop_log_file(LogType::Full);
 	stop_log_file(LogType::Mission);
@@ -1494,26 +1519,29 @@ int Logger::get_log_file_name(LogType type, char *file_name, size_t file_name_si
 	}
 
 	const char *replay_suffix = "";
+	const char *file_type = (type == LogType::Mission) ? "txt" : "ulg";
 
 	if (_replay_file_name) {
 		replay_suffix = "_replayed";
 	}
 
 	char *log_file_name = _file_name[(int)type].log_file_name;
+	int n = 0;
 
 	if (time_ok) {
-		int n = create_log_dir(type, &tt, file_name, file_name_size);
+		n = create_log_dir(type, &tt, file_name, file_name_size);
 		if (n < 0) {
 			return -1;
 		}
 
 		char log_file_name_time[16] = "";
 		strftime(log_file_name_time, sizeof(log_file_name_time), "%H_%M_%S", &tt);
-		snprintf(log_file_name, sizeof(LogFileName::log_file_name), "%s%s.ulg", log_file_name_time, replay_suffix);
+		snprintf(log_file_name, sizeof(LogFileName::log_file_name), "%s%s.%s", log_file_name_time, replay_suffix, file_type);
 		snprintf(file_name + n, file_name_size - n, "/%s", log_file_name);
 
+
 	} else {
-		int n = create_log_dir(type, nullptr, file_name, file_name_size);
+		n = create_log_dir(type, nullptr, file_name, file_name_size);
 		if (n < 0) {
 			return -1;
 		}
@@ -1523,7 +1551,7 @@ int Logger::get_log_file_name(LogType type, char *file_name, size_t file_name_si
 		/* look for the next file that does not exist */
 		while (file_number <= MAX_NO_LOGFILE) {
 			/* format log file path: e.g. /fs/microsd/log/sess001/log001.ulg */
-			snprintf(log_file_name, sizeof(LogFileName::log_file_name), "log%03u%s.ulg", file_number, replay_suffix);
+			snprintf(log_file_name, sizeof(LogFileName::log_file_name), "log%03u%s.%s", file_number, replay_suffix, file_type);
 			snprintf(file_name + n, file_name_size - n, "/%s", log_file_name);
 
 			if (!util::file_exist(file_name)) {
@@ -1537,6 +1565,14 @@ int Logger::get_log_file_name(LogType type, char *file_name, size_t file_name_si
 			/* we should not end up here, either we have more than MAX_NO_LOGFILE on the SD card, or another problem */
 			return -1;
 		}
+	}
+	if (type == LogType::Mission){
+		camera_log_file_s cml;
+		cml.timestamp = hrt_absolute_time();
+		snprintf((char *)cml.filename, 128, "%s", file_name);
+		cml.filename[127] = 0; //ensure 0-termination
+		orb_advert_t orb_camera_file_pub = orb_advertise_queue(ORB_ID(camera_log_file), &cml, 3);
+		orb_publish(ORB_ID(camera_log_file), orb_camera_file_pub, &cml);
 	}
 
 	return 0;
@@ -1744,6 +1780,8 @@ void Logger::write_load_output()
 
 void Logger::write_format(LogType type, const orb_metadata &meta, WrittenFormats &written_formats, ulog_message_format_s& msg, int level)
 {
+	if (type == LogType::Mission)
+		return;
 	if (level > 3) {
 		// precaution: limit recursion level. If we land here it's either a bug or nested topic definitions. In the
 		// latter case, increase the maximum level.
@@ -1876,6 +1914,8 @@ void Logger::write_all_add_logged_msg(LogType type)
 
 void Logger::write_add_logged_msg(LogType type, LoggerSubscription &subscription, int instance)
 {
+	if (type == LogType::Mission)
+		return;
 	ulog_message_add_logged_s msg;
 
 	if (subscription.msg_ids[instance] == (uint8_t) - 1) {
@@ -1905,6 +1945,8 @@ void Logger::write_add_logged_msg(LogType type, LoggerSubscription &subscription
 
 void Logger::write_info(LogType type, const char *name, const char *value)
 {
+	if (type == LogType::Mission)
+		return;
 	_writer.lock();
 	ulog_message_info_header_s msg = {};
 	uint8_t *buffer = reinterpret_cast<uint8_t *>(&msg);
@@ -1930,6 +1972,8 @@ void Logger::write_info(LogType type, const char *name, const char *value)
 
 void Logger::write_info_multiple(LogType type, const char *name, const char *value, bool is_continued)
 {
+	if (type == LogType::Mission)
+		return;
 	_writer.lock();
 	ulog_message_info_multiple_header_s msg;
 	uint8_t *buffer = reinterpret_cast<uint8_t *>(&msg);
@@ -1968,6 +2012,8 @@ void Logger::write_info(LogType type, const char *name, uint32_t value)
 template<typename T>
 void Logger::write_info_template(LogType type, const char *name, T value, const char *type_str)
 {
+	if (type == LogType::Mission)
+		return;
 	_writer.lock();
 	ulog_message_info_header_s msg = {};
 	uint8_t *buffer = reinterpret_cast<uint8_t *>(&msg);
@@ -1990,6 +2036,8 @@ void Logger::write_info_template(LogType type, const char *name, T value, const 
 
 void Logger::write_header(LogType type)
 {
+	if (type == LogType::Mission)
+		return;
 	ulog_file_header_s header = {};
 	header.magic[0] = 'U';
 	header.magic[1] = 'L';
@@ -2016,6 +2064,8 @@ void Logger::write_header(LogType type)
 
 void Logger::write_version(LogType type)
 {
+	if (type == LogType::Mission)
+		return;
 	write_info(type, "ver_sw", px4_firmware_version_string());
 	write_info(type, "ver_sw_release", px4_firmware_version());
 	uint32_t vendor_version = px4_firmware_vendor_version();
@@ -2097,6 +2147,8 @@ void Logger::write_version(LogType type)
 
 void Logger::write_parameters(LogType type)
 {
+	if (type == LogType::Mission)
+		return;
 	_writer.lock();
 	ulog_message_parameter_header_s msg = {};
 	uint8_t *buffer = reinterpret_cast<uint8_t *>(&msg);
@@ -2165,6 +2217,8 @@ void Logger::write_parameters(LogType type)
 
 void Logger::write_changed_parameters(LogType type)
 {
+	if (type == LogType::Mission)
+		return;
 	_writer.lock();
 	ulog_message_parameter_header_s msg = {};
 	uint8_t *buffer = reinterpret_cast<uint8_t *>(&msg);
