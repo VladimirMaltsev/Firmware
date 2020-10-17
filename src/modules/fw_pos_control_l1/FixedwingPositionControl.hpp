@@ -106,7 +106,7 @@ using namespace runwaytakeoff;
 using namespace time_literals;
 
 static constexpr float HDG_HOLD_DIST_NEXT =
-        3000.0f; // initial distance of waypoint in front of plane in heading hold mode
+        300.0f; // initial distance of waypoint in front of plane in heading hold mode
 static constexpr float HDG_HOLD_REACHED_DIST =
         1000.0f; // distance (plane to waypoint in front) at which waypoints are reset in heading hold mode
 static constexpr float HDG_HOLD_SET_BACK_DIST = 100.0f; // distance by which previous waypoint is set behind the plane
@@ -152,30 +152,30 @@ public:
     bool parachute_dropped = false;
 
     //turning loop
-    double loop_pre_exit_lat{0.f};
-    double loop_pre_exit_lon{0.f};
-    double loop_exit_lat{0.f};
-    double loop_exit_lon{0.f};
+        double loop_pre_exit_lat{0.f};
+        double loop_pre_exit_lon{0.f};
+        double loop_exit_lat{0.f};
+        double loop_exit_lon{0.f};
 
-    double loop_pre_enter_lat{0.f};
-    double loop_pre_enter_lon{0.f};
-    double loop_enter_lat{0.f};
-    double loop_enter_lon{0.f};
-    double loop_middle_lat{0.f};
-    double loop_middle_lon{0.f};
+        double loop_pre_enter_lat{0.f};
+        double loop_pre_enter_lon{0.f};
+        double loop_enter_lat{0.f};
+        double loop_enter_lon{0.f};
+        double loop_middle_lat{0.f};
+        double loop_middle_lon{0.f};
 
-    bool do_turning_loop{false};
-    int loop_waypoint_curr{0};
-    float acc_turning_radius{100};
-    float radius{200};
+        bool do_turning_loop{false};
+        int loop_waypoint_curr{0};
+        float acc_turning_radius{100};
+        float radius{200};
 
     //unexpected descent detector
-    bool unexpected_descent{false};
-    bool check_unexp_desc{false};
-    float dangerous_diff{0.f};
-    float dangerous_dist_to_takeoff_alt{0.f};
-    hrt_abstime dang_alt_time_det{0};
-    hrt_abstime unexp_desc_time{0};
+        bool unexpected_descent{false};
+        bool check_unexp_desc{false};
+        float dangerous_diff{0.f};
+        float dangerous_dist_to_takeoff_alt{0.f};
+        hrt_abstime dang_alt_time_det{0};
+        hrt_abstime unexp_desc_time{0};
 
 
 private:
@@ -242,6 +242,8 @@ private:
     position_setpoint_s _hdg_hold_curr_wp {};		///< position to which heading hold flies */
 
     hrt_abstime _control_position_last_called{0};		///< last call of control_position  */
+    hrt_abstime _manual_mode_last_updated{0};
+    bool _manual_mode_enabled{false};
 
     /* Landing */
     bool _land_noreturn_horizontal{false};
@@ -484,7 +486,7 @@ private:
     void		control_takeoff(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
                                 const position_setpoint_s &pos_sp_curr);
     void		control_landing(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
-                                const position_setpoint_s &pos_sp_curr, float wp_distance);
+                                    const position_setpoint_s &pos_sp_curr, float wp_distance);
     float		get_tecs_pitch();
     float		get_tecs_thrust();
 
