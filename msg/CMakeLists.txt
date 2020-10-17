@@ -56,6 +56,7 @@ set(msg_files
 	ekf2_timestamps.msg
 	ekf_gps_drift.msg
 	ekf_gps_position.msg
+	engine_status.msg
 	esc_report.msg
 	esc_status.msg
 	estimator_status.msg
@@ -109,6 +110,7 @@ set(msg_files
 	sensor_preflight.msg
 	sensor_selection.msg
 	servorail_status.msg
+	stg_status.msg
 	subsystem_info.msg
 	system_power.msg
 	task_stack_info.msg
