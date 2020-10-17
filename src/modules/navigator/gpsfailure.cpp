@@ -47,6 +47,7 @@
 #include <uORB/topics/mission.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
+#include <uORB/topics/actuator_controls.h>
 #include <mathlib/mathlib.h>
 
 using matrix::Eulerf;
@@ -54,7 +55,8 @@ using matrix::Quatf;
 
 GpsFailure::GpsFailure(Navigator *navigator) :
 	MissionBlock(navigator),
-	ModuleParams(navigator)
+	ModuleParams(navigator),
+	_sub_airdata(ORB_ID(vehicle_air_data))
 {
 }
 
@@ -85,8 +87,18 @@ GpsFailure::on_active()
 			 * navigator has to publish an attitude setpoint */
 			vehicle_attitude_setpoint_s att_sp = {};
 			att_sp.timestamp = hrt_absolute_time();
+
+			// get baro altitude
+			_sub_airdata.update();
+			const float baro_altitude_amsl = _sub_airdata.get().baro_alt_meter;
+			if (baro_altitude_amsl - _gps_failed_altitude < 500.f) {
+				att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
+			} else if (baro_altitude_amsl - _gps_failed_altitude > 550.f){
+				att_sp.pitch_body = -5.f;
+			} else
+				att_sp.pitch_body = 0.f;
+
 			att_sp.roll_body = math::radians(_param_nav_gpsf_r.get());
-			att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
 			att_sp.thrust_body[0] = _param_nav_gpsf_tr.get();
 
 			Quatf q(Eulerf(att_sp.roll_body, att_sp.pitch_body, 0.0f));
@@ -114,10 +126,80 @@ GpsFailure::on_active()
 		}
 
 	case GPSF_STATE_TERMINATE:
+	{
+		px4_usleep(2*1000000);
+		int sys_autostart = 0;
+		param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
+		vehicle_attitude_setpoint_s att_sp = {};
+		att_sp.thrust_body[0] = 0.f;
+		struct actuator_controls_s act1 = {};
+
+		if (sys_autostart == 3239) {
+			act1.control[5] = 0.65f;
+		}
+		if (sys_autostart == 2101) {
+			act1.control[5] = -0.97f; //parachute drop
+			act1.control[6] = 0.15f; //buffer drop
+		}
+
+		act1.timestamp = hrt_absolute_time();
+
+		orb_advert_t    act_pub1{nullptr};
+		act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+
+		//-SET-MODE-START-----------------------------
+		vehicle_command_s vcmd_mode = {};
+		vcmd_mode.timestamp = hrt_absolute_time();
+		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
+		vcmd_mode.param1 = 29;
+		vcmd_mode.param2 = 4;
+		vcmd_mode.param3 = 3;
+		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
+		vcmd_mode.target_system = 1;
+		vcmd_mode.target_component = 1;
+		vcmd_mode.source_system = 255;
+		vcmd_mode.source_component = 0;
+		vcmd_mode.confirmation = 0;
+		vcmd_mode.from_external = true;
+
+		orb_advert_t _cmd_pub_mode{nullptr};
+		if (_cmd_pub_mode == nullptr) {
+			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
+		} else {
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
+		}
+		//-SET-MODE-END-----------------------------
+
+		vehicle_command_s vcmd_disarm = {};
+		vcmd_disarm.timestamp = hrt_absolute_time();
+		vcmd_disarm.param1 = 0;
+		vcmd_disarm.param2 = 0;
+		vcmd_disarm.param3 = 0;
+		vcmd_disarm.param4 = 0;
+		vcmd_disarm.param5 = 0;
+		vcmd_disarm.param6 = 0;
+		vcmd_disarm.param7 = 0;
+		vcmd_disarm.command = 400;
+		vcmd_disarm.target_system = 1;
+		vcmd_disarm.target_component = 1;
+		vcmd_disarm.source_system = 255;
+		vcmd_disarm.source_component = 0;
+		vcmd_disarm.confirmation = 0;
+		vcmd_disarm.from_external = true;
+
+		orb_advert_t _cmd_pub1{nullptr};
+		if (_cmd_pub1 == nullptr) {
+			_cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
+
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+		} else {
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+		}
 		set_gpsf_item();
 		advance_gpsf();
 		break;
-
+	}
 	default:
 		break;
 	}
@@ -155,6 +237,11 @@ GpsFailure::advance_gpsf()
 	switch (_gpsf_state) {
 	case GPSF_STATE_NONE:
 		_gpsf_state = GPSF_STATE_LOITER;
+
+		// get baro altitude
+		_sub_airdata.update();
+		_gps_failed_altitude = _sub_airdata.get().baro_alt_meter;
+
 		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Global position failure: fixed bank loiter");
 		break;
 
