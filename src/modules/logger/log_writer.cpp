@@ -178,6 +178,14 @@ int LogWriter::write_message(LogType type, void *ptr, size_t size, uint64_t drop
 	return ret_mavlink;
 }
 
+int LogWriter::write_message_straightforward(LogType type, void *ptr, size_t size){
+	int ret_file = 0;
+	ret_file = _log_writer_file_for_write->write_message_straightforward(type, ptr, size);
+
+	return ret_file;
+
+}
+
 void LogWriter::select_write_backend(Backend sel_backend)
 {
 	if (sel_backend & BackendFile) {

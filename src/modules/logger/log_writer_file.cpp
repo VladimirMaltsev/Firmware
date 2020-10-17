@@ -330,6 +330,10 @@ int LogWriterFile::write_message(LogType type, void *ptr, size_t size, uint64_t 
 	return write(type, ptr, size, dropout_start);
 }
 
+int LogWriterFile::write_message_straightforward(LogType type, void *ptr, size_t size){
+	_buffers[(int)type].write_no_check(ptr, size);
+}
+
 int LogWriterFile::write(LogType type, void *ptr, size_t size, uint64_t dropout_start)
 {
 	if (!is_started(type)) {

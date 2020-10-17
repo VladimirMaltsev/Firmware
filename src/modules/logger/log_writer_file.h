@@ -86,6 +86,8 @@ public:
 	/** @see LogWriter::write_message() */
 	int write_message(LogType type, void *ptr, size_t size, uint64_t dropout_start = 0);
 
+	int write_message_straightforward(LogType type, void *ptr, size_t size);
+
 	void lock()
 	{
 		pthread_mutex_lock(&_mtx);
