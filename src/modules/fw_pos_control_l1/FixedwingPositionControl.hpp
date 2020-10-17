@@ -84,6 +84,7 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/engine_status.h>
 #include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
@@ -106,7 +107,7 @@ using namespace runwaytakeoff;
 using namespace time_literals;
 
 static constexpr float HDG_HOLD_DIST_NEXT =
-        300.0f; // initial distance of waypoint in front of plane in heading hold mode
+        3000.0f; // initial distance of waypoint in front of plane in heading hold mode
 static constexpr float HDG_HOLD_REACHED_DIST =
         1000.0f; // distance (plane to waypoint in front) at which waypoints are reset in heading hold mode
 static constexpr float HDG_HOLD_SET_BACK_DIST = 100.0f; // distance by which previous waypoint is set behind the plane
@@ -147,11 +148,12 @@ public:
 
     /** @see ModuleBase::print_status() */
     int print_status() override;
-
     bool parachute_released = false;
     bool parachute_dropped = false;
 
-    //turning loop
+    bool ready_to_fly = false;
+
+ //turning loop
         double loop_pre_exit_lat{0.f};
         double loop_pre_exit_lon{0.f};
         double loop_exit_lat{0.f};
@@ -168,16 +170,6 @@ public:
         int loop_waypoint_curr{0};
         float acc_turning_radius{100};
         float radius{200};
-
-    //unexpected descent detector
-        bool unexpected_descent{false};
-        bool check_unexp_desc{false};
-        float dangerous_diff{0.f};
-        float dangerous_dist_to_takeoff_alt{0.f};
-        hrt_abstime dang_alt_time_det{0};
-        hrt_abstime unexp_desc_time{0};
-
-
 private:
     orb_advert_t	_mavlink_log_pub{nullptr};
 
@@ -192,6 +184,7 @@ private:
     int		_params_sub{-1};			///< notification of parameter updates */
     int		_manual_control_sub{-1};		///< notification of manual control updates */
     int		_sensor_baro_sub{-1};
+    int         _engine_status_sub{-1};
 
     orb_advert_t	_attitude_sp_pub{nullptr};		///< attitude setpoint */
     orb_advert_t	_pos_ctrl_status_pub{nullptr};		///< navigation capabilities publication */
@@ -217,6 +210,7 @@ private:
     vehicle_local_position_s	_local_pos {};			///< vehicle local position */
     vehicle_land_detected_s		_vehicle_land_detected {};	///< vehicle land detected */
     vehicle_status_s		_vehicle_status {};		///< vehicle status */
+    engine_status_s             _ess{};
     struct actuator_controls_s act = {};
     struct actuator_controls_s act0 = {};
     struct actuator_controls_s act1 = {};
@@ -242,8 +236,6 @@ private:
     position_setpoint_s _hdg_hold_curr_wp {};		///< position to which heading hold flies */
 
     hrt_abstime _control_position_last_called{0};		///< last call of control_position  */
-    hrt_abstime _manual_mode_last_updated{0};
-    bool _manual_mode_enabled{false};
 
     /* Landing */
     bool _land_noreturn_horizontal{false};
@@ -265,7 +257,6 @@ private:
     float _flare_curve_alt_rel_last{0.0f};
     float _target_bearing{0.0f};				///< estimated height to ground at which flare started */
 
-
     bool _was_in_air{false};				///< indicated wether the plane was in the air in the previous interation*/
     hrt_abstime _time_went_in_air{0};			///< time at which the plane went in the air */
 
@@ -273,6 +264,10 @@ private:
     LaunchDetector _launchDetector;
     LaunchDetectionResult _launch_detection_state{LAUNCHDETECTION_RES_NONE};
     hrt_abstime _launch_detection_notify{0};
+
+    hrt_abstime _engine_restart_thr_delay{0};
+    bool enable_engine_restart = false;
+    bool is_landing = false;
 
     RunwayTakeoff _runway_takeoff;
 
@@ -350,7 +345,6 @@ private:
         float land_throtTC_scale;
 
         float loiter_radius;
-        int32_t sys_autostart;
 
         // VTOL
         float airspeed_trans;
@@ -418,7 +412,6 @@ private:
         param_t land_throtTC_scale;
 
         param_t loiter_radius;
-        param_t sys_autostart;
 
         param_t vtol_type;
     } _parameter_handles {};				///< handles for interesting parameters */
@@ -443,7 +436,7 @@ private:
     void		tecs_status_publish();
 
     void		abort_landing(bool abort);
-    void                detect_unexpected_descent(position_setpoint_s psc);
+    void                engine_status_poll();
 
     /**
      * Get a new waypoint based on heading and distance from current position

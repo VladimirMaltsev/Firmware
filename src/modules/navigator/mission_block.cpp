@@ -174,6 +174,8 @@ MissionBlock::is_mission_item_reached()
 					if ((dist >= 0.0f)
 					    && (dist_z < _navigator->get_loiter_radius())
 					    && (dist_xy <= _navigator->get_loiter_radius() * 1.2f)) {
+						
+						//mavlink_log_critical(&_mavlink_log_pub, "SETPOINT_TYPE_LOITER -> SETPOINT_TYPE_POSITION");
 
 						curr_sp->type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 						_navigator->set_position_setpoint_triplet_updated();

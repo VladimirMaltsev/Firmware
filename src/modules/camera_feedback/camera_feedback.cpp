@@ -40,7 +40,6 @@
  */
 
 #include "camera_feedback.hpp"
-#include <lib/matrix/matrix/math.hpp>
 
 namespace camera_feedback
 {
@@ -52,7 +51,6 @@ CameraFeedback::CameraFeedback() :
 	_main_task(-1),
 	_trigger_sub(-1),
 	_gpos_sub(-1),
-	_time_sub(-1),
 	_att_sub(-1),
 	_capture_pub(nullptr),
 	_camera_capture_feedback(false)
@@ -135,9 +133,7 @@ CameraFeedback::task_main()
 
 	// Geotagging subscriptions
 	_gpos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
-	_time_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
-	struct vehicle_gps_position_s gps_time = {};
 	struct vehicle_global_position_s gpos = {};
 	struct vehicle_attitude_s att = {};
 
@@ -153,43 +149,37 @@ CameraFeedback::task_main()
 			continue;
 		}
 
-		// bool cycle = false;
-		// orb_check(_trigger_sub, &cycle);
-
 		/* trigger subscription updated */
-		if (/*cycle */fds[0].revents & POLLIN) {
+		if (fds[0].revents & POLLIN) {
 
 			orb_copy(ORB_ID(camera_trigger), _trigger_sub, &trig);
 
 			/* update geotagging subscriptions */
 			orb_check(_gpos_sub, &updated);
-			if (updated)
+
+			if (updated) {
 				orb_copy(ORB_ID(vehicle_global_position), _gpos_sub, &gpos);
-
-			/* update time subscriptions */
-			orb_check(_time_sub, &updated);
-			if (updated)
-				orb_copy(ORB_ID(vehicle_gps_position), _time_sub, &gps_time);
-
+			}
 
 			orb_check(_att_sub, &updated);
-			if (updated)
+
+			if (updated) {
 				orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att);
+			}
 
-
-			// if (trig.timestamp == 0 ||
-			//     gpos.timestamp == 0 ||
-			//     att.timestamp == 0) {
-			// 	// reject until we have valid data
-			// 	continue;
-			// }
+			if (trig.timestamp == 0 ||
+			    gpos.timestamp == 0 ||
+			    att.timestamp == 0) {
+				// reject until we have valid data
+				continue;
+			}
 
 			struct camera_capture_s capture = {};
 
 			// Fill timestamps
 			capture.timestamp = trig.timestamp;
 
-			capture.timestamp_utc = gps_time.time_utc_usec;
+			capture.timestamp_utc = trig.timestamp_utc;
 
 			// Fill image sequence
 			capture.seq = trig.seq;
@@ -205,12 +195,13 @@ CameraFeedback::task_main()
 
 			// Fill attitude data
 			// TODO : this needs to be rotated by camera orientation or set to gimbal orientation when available
-			matrix::Eulerf euler = matrix::Quatf(att.q);
-			capture.q[0] = euler.phi(); //roll
-			capture.q[1] = euler.theta(); //pitch
-			capture.q[2] = euler.psi(); //yaw
+			capture.q[0] = att.q[0];
 
+			capture.q[1] = att.q[1];
 
+			capture.q[2] = att.q[2];
+
+			capture.q[3] = att.q[3];
 
 			// Indicate whether capture feedback from camera is available
 			// What is case 0 for capture.result?

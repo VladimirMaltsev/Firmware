@@ -97,6 +97,7 @@
 #include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
+#include <uORB/topics/stg_status.h>
 #include <uORB/topics/vehicle_status_flags.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 
@@ -1086,7 +1087,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 	case 60606: //MAV_CMD_DO_ENGINE_ACTION
 	case 60666: //MAV_CMD_RELEASE_BUFFER_PARACHUTE
 	case 60667: //MAV_CMD_DROP_BUFFER_PARACHUTE
-	case 20001: //MAV_CMD_STG_ACTION
+	//case 20001: //MAV_CMD_STG_ACTION
 		/* ignore commands that are handled by other parts of the system */
 		break;
 
@@ -1286,6 +1287,7 @@ Commander::run()
 	int cpuload_sub = orb_subscribe(ORB_ID(cpuload));
 	int geofence_result_sub = orb_subscribe(ORB_ID(geofence_result));
 	int land_detector_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+	//int stg_status_sub = orb_subscribe(ORB_ID(stg_status));
 	int offboard_control_mode_sub = orb_subscribe(ORB_ID(offboard_control_mode));
 	int param_changed_sub = orb_subscribe(ORB_ID(parameter_update));
 	int safety_sub = orb_subscribe(ORB_ID(safety));
@@ -1669,9 +1671,22 @@ Commander::run()
 		estimator_check(&status_changed);
 		airspeed_use_check();
 
+		/*Update stg_status check*/
+		// bool updated_stg = false;
+		// orb_check(stg_status_sub, &updated_stg);
+		// if (updated_stg){
+		// 	struct stg_status_s s_s = {};
+		// 	orb_copy(ORB_ID(stg_status), stg_status_sub, &s_s);
+
+		// 	if (armed.armed){
+		// 		if(s_s.rpm_cranckshaft < 22) {
+					
+		// 		}
+		// 	}
+		// }
+
 		/* Update land detector */
 		orb_check(land_detector_sub, &updated);
-
 		if (updated) {
 			orb_copy(ORB_ID(vehicle_land_detected), land_detector_sub, &land_detector);
 
@@ -1680,6 +1695,15 @@ Commander::run()
 				if (was_landed != land_detector.landed) {
 					if (land_detector.landed) {
 						mavlink_and_console_log_info(&mavlink_log_pub, "Landing detected");
+						tune_control_s tune_control = {};
+						orb_advert_t tune_control_pub = nullptr;     
+						tune_control_pub = orb_advertise(ORB_ID(tune_control), &tune_control);
+
+						tune_control.tune_id = 8;
+						tune_control.volume = tune_control_s::VOLUME_LEVEL_MAX;
+						tune_control.tune_override = 1;
+						tune_control.timestamp = hrt_absolute_time();
+						orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 
 					} else {
 						mavlink_and_console_log_info(&mavlink_log_pub, "Takeoff detected");
@@ -1759,7 +1783,7 @@ Commander::run()
 			orb_copy(ORB_ID(cpuload), cpuload_sub, &cpuload);
 		}
 
-		battery_status_check();
+		//battery_status_check();
 
 		/* update subsystem info which arrives from outside of commander*/
 		do {
@@ -2499,6 +2523,7 @@ Commander::run()
 	orb_unsubscribe(subsys_sub);
 	orb_unsubscribe(param_changed_sub);
 	orb_unsubscribe(land_detector_sub);
+	//orb_unsubscribe(stg_status);
 
 	thread_running = false;
 }
@@ -4026,7 +4051,7 @@ void Commander::battery_status_check()
 				status_flags.condition_battery_healthy = false;
 			}
 
-			// execute battery failsafe if the state has gotten worse
+			/*// execute battery failsafe if the state has gotten worse
 			if (armed.armed) {
 				if (battery.warning > _battery_warning) {
 					battery_failsafe(&mavlink_log_pub, status, status_flags, &internal_state, battery.warning,
@@ -4050,7 +4075,7 @@ void Commander::battery_status_check()
 						while (1) { px4_usleep(1); }
 					}
 				}
-			}
+			}*/
 
 			// save last value
 			_battery_warning = battery.warning;

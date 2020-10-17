@@ -42,9 +42,6 @@
 #include <px4_module_params.h>
 
 #include "mission_block.h"
-#include <uORB/Subscription.hpp>
-#include <uORB/topics/home_position.h>
-#include <uORB/topics/vehicle_air_data.h>
 
 class Navigator;
 
@@ -76,8 +73,6 @@ private:
 	hrt_abstime _timestamp_activation{0}; //*< timestamp when this mode was activated */
 
 	orb_advert_t	_att_sp_pub{nullptr};
-	uORB::Subscription<vehicle_air_data_s>	_sub_airdata;
-	float _gps_failed_altitude{0};
 
 	/**
 	 * Set the GPSF item

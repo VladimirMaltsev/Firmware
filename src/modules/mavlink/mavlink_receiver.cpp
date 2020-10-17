@@ -40,7 +40,6 @@
  * @author Thomas Gubler <thomas@px4.io>
  */
 #include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/tune_control.h>
 #include <airspeed/airspeed.h>
 #include <commander/px4_custom_mode.h>
 #include <conversion/rotation.h>
@@ -133,6 +132,11 @@ void
 MavlinkReceiver::handle_message(mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
+	case MAVLINK_MSG_ID_STG_STATUS:
+		handle_message_battery_status(msg);
+		handle_message_stg_status_msg(msg);
+		break;
+
 	case MAVLINK_MSG_ID_COMMAND_LONG:
 		handle_message_command_long(msg);
 		break;
@@ -226,7 +230,7 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		break;
 
 	case MAVLINK_MSG_ID_BATTERY_STATUS:
-		handle_message_battery_status(msg);
+		//handle_message_battery_status(msg);
 		break;
 
 	case MAVLINK_MSG_ID_SERIAL_CONTROL:
@@ -329,9 +333,7 @@ MavlinkReceiver::evaluate_target_ok(int command, int target_system, int target_c
 		/* broadcast and ignore component */
 		target_ok = (target_system == 0) || (target_system == mavlink_system.sysid);
 		break;
-	case MAV_CMD_REQUEST_MESSAGE:
-		target_ok = true;
-		break;
+
 	default:
 		target_ok = (target_system == mavlink_system.sysid) && ((target_component == mavlink_system.compid)
 				|| (target_component == MAV_COMP_ID_ALL));
@@ -431,6 +433,8 @@ MavlinkReceiver::handle_message_command_long(mavlink_message_t *msg)
 	vcmd.confirmation = cmd_mavlink.confirmation;
 	vcmd.from_external = true;
 
+	//mavlink_log_critical(&_mavlink_log_pub, "p1 = %3.3f p2 = %3.3f p3 = %3.3f p4 = %3.3f p5 = %3.3f p6 = %3.3f", vcmd.param1, vcmd.param2, vcmd.param3, vcmd.param4, vcmd.param5, vcmd.param6);
+
 	handle_message_command_both(msg, cmd_mavlink, vcmd);
 }
 
@@ -467,7 +471,9 @@ template <class T>
 void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const T &cmd_mavlink,
 		const vehicle_command_s &vehicle_command)
 {
-	mavlink_log_critical(&_mavlink_log_pub, "cmd = %d mess_id = %d, index = %d", cmd_mavlink.command, (uint16_t)roundf(vehicle_command.param1), (uint16_t)roundf(vehicle_command.param2));
+
+	int airframe_mode = 1; // 0 - 101, 1 - diam20
+
 	bool target_ok = evaluate_target_ok(cmd_mavlink.command, cmd_mavlink.target_system, cmd_mavlink.target_component);
 
 	bool send_ack = true;
@@ -477,24 +483,39 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		acknowledge(msg->sysid, msg->compid, cmd_mavlink.command, vehicle_command_ack_s::VEHICLE_RESULT_FAILED);
 		return;
 	}
-	if (cmd_mavlink.command == 60123){
-		//show log filename;
+	if (cmd_mavlink.command == 60777){
+		engine_status_s ess = {};
+		ess.timestamp = hrt_absolute_time();
+		ess.eng_st = cmd_mavlink.param1;
 
-		camera_log_file_s cml;
-		orb_copy(ORB_ID(camera_log_file), _cam_file_sub, &cml);
-		mavlink_log_info(&_mavlink_log_pub, "%s", cml.filename);
+		orb_advert_t _cmd_eng_st{nullptr};
 
-	}else if (cmd_mavlink.command == MAV_CMD_RELEASE_BUFFER_PARACHUTE) {
+		if (_cmd_eng_st == nullptr) {
+			_cmd_eng_st = orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
+			orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
+		} else {
+			orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
+		}
+	}else if (cmd_mavlink.command ==MAV_CMD_RELEASE_BUFFER_PARACHUTE){
+		engine_status_s ess = {};
+		ess.timestamp = hrt_absolute_time();
+		ess.eng_st = 3;
 
-		int sys_autostart = 0;
-		float min_thr = 0.f;
-		param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
-		param_get(param_find("FW_THR_MIN"), &min_thr);
+		orb_advert_t _cmd_eng_st{nullptr};
+
+		if (_cmd_eng_st == nullptr) {
+			_cmd_eng_st = orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
+			orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
+		} else {
+			orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
+		}
+
+		float idle_thr = 0.f;
+		param_get(param_find("FW_THR_IDLE"), &idle_thr);
 
 		int disable_airspeed = 1;
-                param_set(param_find("FW_ARSP_MODE"), &disable_airspeed);
-
-            	param_set(param_find("FW_THR_MAX"), &min_thr);
+		param_set(param_find("FW_ARSP_MODE"), &disable_airspeed);
+		param_set(param_find("FW_THR_MAX"), &idle_thr);
 
 		px4_sleep(2);
 
@@ -502,35 +523,39 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		param_set(param_find("FW_THR_MIN"), &zero_thr);
 		param_set(param_find("FW_THR_MAX"), &zero_thr);
 
+		px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+		px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
+		mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+
 		vehicle_command_s vcmd_disarm = {};
-                vcmd_disarm.timestamp = hrt_absolute_time();
-                vcmd_disarm.param1 = 0;
-                vcmd_disarm.param2 = 0;
-                vcmd_disarm.param3 = 0;
-                vcmd_disarm.param4 = 0;
-                vcmd_disarm.param5 = 0;
-                vcmd_disarm.param6 = 0;
-                vcmd_disarm.param7 = 0;
-                vcmd_disarm.command = 400;
-                vcmd_disarm.target_system = 1;
-                vcmd_disarm.target_component = 1;
-                vcmd_disarm.source_system = 255;
-                vcmd_disarm.source_component = 0;
+		vcmd_disarm.timestamp = hrt_absolute_time();
+		vcmd_disarm.param1 = 0;
+		vcmd_disarm.param2 = 0;
+		vcmd_disarm.param3 = 0;
+		vcmd_disarm.param4 = 0;
+		vcmd_disarm.param5 = 0;
+		vcmd_disarm.param6 = 0;
+		vcmd_disarm.param7 = 0;
+		vcmd_disarm.command = 400;
+		vcmd_disarm.target_system = 1;
+		vcmd_disarm.target_component = 1;
+		vcmd_disarm.source_system = 255;
+		vcmd_disarm.source_component = 0;
 
-                orb_advert_t _cmd_pub1{nullptr};
+		orb_advert_t _cmd_pub1{nullptr};
 
-                vcmd_disarm.confirmation = 0;
-                vcmd_disarm.from_external = true;
+		vcmd_disarm.confirmation = 0;
+		vcmd_disarm.from_external = true;
 
-                if (_cmd_pub1 == nullptr) {
-                    _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
+		if (_cmd_pub1 == nullptr) {
+			_cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+		} else {
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+		}
 
-                    orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-                } else {
-                    orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-                }
+		//-SET-MODE-START-----------------------------
 
-	//-SET-MODE-START-----------------------------
 		vehicle_command_s vcmd_mode = {};
 		vcmd_mode.timestamp = hrt_absolute_time();
 
@@ -553,67 +578,79 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		} else {
 			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_mode);
 		}
-	//-SET-MODE-END-----------------------------
+
+		//-SET-MODE-END-----------------------------
 
 		px4_sleep(2);
 
-		if (sys_autostart == 3239) {
-			act1.control[5] = 0.65f;
-		} else if (sys_autostart == 2101){
-			act1.control[5] = -0.97f;
-			act1.control[6] = 0.15f;
+		act1.control[5] = -0.97f;
+		act1.control[6] = 0.2f;
+		act1.timestamp = hrt_absolute_time();
+		if (act_pub1 != nullptr) {
+				orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
 		} else {
-			_mavlink->send_statustext_critical("Unsupported airframe");
+				act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
 		}
-                act1.timestamp = hrt_absolute_time();
-                if (act_pub1 != nullptr) {
-                        orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-                } else {
-                        act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-                }
+		mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
 
 		px4_sleep(2);
 		float thr_100 = 1.f;
-		param_set(param_find("FW_THR_MIN"), &min_thr);
+		param_set(param_find("FW_THR_MIN"), &idle_thr);
 		param_set(param_find("FW_THR_MAX"), &thr_100);
 
 		int enable_airspeed = 0;
-                param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
+        param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);	
+	} else if (cmd_mavlink.command == MAV_CMD_DROP_BUFFER_PARACHUTE){
 
-	} else if (cmd_mavlink.command == MAV_CMD_DROP_BUFFER_PARACHUTE) {
-
-		int sys_autostart = 0;
-		param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
-
-		if (sys_autostart == 3239){
-			act1.control[5] = 0.9f;
-		} else if (sys_autostart == 2101) {
-			act1.control[7] = 1.0f;
-			act1.control[6] = 0.0;
-		} else {
-			_mavlink->send_statustext_critical("Unsupported airframe");
-		}
+		act1.control[7] = 1.0f;
+		act1.control[6] = 0.0f;
 		act1.timestamp = hrt_absolute_time();
-		if (act_pub1 != nullptr) {
+		if (act_pub1 != nullptr)
 			orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-		} else {
+		else
 			act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-		}
-	}
-	else if (cmd_mavlink.command == MAV_CMD_SWITCH_REMOTE_OVERRIDE_MODE){
+
+		mavlink_log_critical(&_mavlink_log_pub, "Parachute unhooked");
+
+	} else if (cmd_mavlink.command == MAV_CMD_SWITCH_REMOTE_OVERRIDE_MODE){
 		if(cmd_mavlink.param1 == 0 ){ //remote controller
 			int ATCcommand = 5 ;
 			param_set (param_find ("NAV_RCL_ACT"), &ATCcommand) ;
+
 			input_rc_s input_rc = {};
 			orb_advertise(ORB_ID(input_rc), &input_rc) ;
+
 			remoteMode = true ;
 			_mavlink->send_statustext_critical("remote_control_mode");
 		} else if (cmd_mavlink.param1 == 1){ //channels override
 			input_rc_s input_rc = {};
 			orb_advertise (ORB_ID(input_rc) , &input_rc);
+
 			remoteMode = false;
 			_mavlink->send_statustext_critical("channels_override_mode");
 		}
+	} else if (cmd_mavlink.command == MAV_CMD_DO_ENGINE_ACTION){
+
+		px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+		if (cmd_mavlink.param1 == 0){
+			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
+			mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+		}else{
+			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
+			mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
+		}
+
+	} else if (cmd_mavlink.command == MAV_CMD_STG_ACTION){
+		//_mavlink->send_statustext_critical("send STG_ACTION");
+		vehicle_command_s vcmd_stg = vehicle_command;
+		vcmd_stg.from_external = false;
+		if (vehicle_command.param1 == 1)
+			mavlink_log_critical(&_mavlink_log_pub, "Starter ON");
+		if (_cmd_pub == nullptr) 
+			_cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
+		else 
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
+		
 	} else if (cmd_mavlink.command == MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES) {
 		/* send autopilot version message */
 		_mavlink->send_autopilot_capabilites();
@@ -640,15 +677,6 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		if ((int)(cmd_mavlink.param2 + 0.5f) == 1) {
 			send_storage_information(cmd_mavlink.param1 + 0.5f);
 		}
-
-	} else if (cmd_mavlink.command == MAV_CMD_REQUEST_MESSAGE) {
-
-		uint16_t message_id = (uint16_t)roundf(vehicle_command.param1);
-
-		mavlink_log_critical(&_mavlink_log_pub, "mess_id = %d, index = %d", message_id, vehicle_command.param2);
-		result = handle_request_message_command(message_id,
-							vehicle_command.param2, vehicle_command.param3, vehicle_command.param4,
-							vehicle_command.param5, vehicle_command.param6, vehicle_command.param7);
 
 	} else {
 
@@ -692,20 +720,6 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 
 	if (send_ack) {
 		acknowledge(msg->sysid, msg->compid, cmd_mavlink.command, result);
-	}
-}
-
-uint8_t MavlinkReceiver::handle_request_message_command(uint16_t message_id, float param2, float param3, float param4,
-		float param5, float param6, float param7)
-{
-	for (const auto &stream : _mavlink->get_streams()) {
-		if (stream->get_id() == message_id) {
-
-			if (message_id == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED){
-				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
-			}
-			break;
-		}
 	}
 }
 
@@ -1673,55 +1687,74 @@ MavlinkReceiver::handle_message_ping(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 {
-	if (msg->sysid != mavlink_system.sysid) {
-		// ignore battery status of other system
-		return;
-	}
-
-	// external battery measurements
-	mavlink_battery_status_t battery_mavlink;
-	mavlink_msg_battery_status_decode(msg, &battery_mavlink);
-
 	battery_status_s battery_status = {};
 	battery_status.timestamp = hrt_absolute_time();
 
-	float voltage_sum = 0.0f;
-	uint8_t cell_count = 0;
+	if (msg->msgid == MAVLINK_MSG_ID_STG_STATUS) {
+		
+		mavlink_stg_status_t status;
+		mavlink_msg_stg_status_decode(msg, &status);
 
-	while (battery_mavlink.voltages[cell_count] < UINT16_MAX && cell_count < 10) {
-		voltage_sum += (float)(battery_mavlink.voltages[cell_count]) / 1000.0f;
-		cell_count++;
+		//mavlink_log_critical(&_mavlink_log_pub, "volt_bat = %d  volt_gen = %d  err_mask = %d", status.voltage_battery, status.voltage_generator, status.stg_errors_bitmask);
+
+		battery_status.voltage_v = (float)status.voltage_battery;
+		battery_status.voltage_filtered_v  = (float)status.voltage_generator;
+		battery_status.current_a = (float)status.current_battery;
+		battery_status.current_filtered_a = (float)status.current_generator;
+		battery_status.remaining = (float)status.current_charge;
+		battery_status.discharged_mah = (float)status.power_load;
+		battery_status.cell_count = status.rpm_cranckshaft;
+		battery_status.connected = true;
+
+
+	} else {
+		if (msg->sysid != mavlink_system.sysid) {
+			// ignore battery status of other system
+			return;
+		}
+		float voltage_sum = 0.0f;
+		uint8_t cell_count = 0;
+
+		// external battery measurements
+		mavlink_battery_status_t battery_mavlink;
+		mavlink_msg_battery_status_decode(msg, &battery_mavlink);
+	
+		while (battery_mavlink.voltages[cell_count] < UINT16_MAX && cell_count < 10) {
+			voltage_sum += (float)(battery_mavlink.voltages[cell_count]) / 1000.0f;
+			cell_count++;
+		}
+
+		battery_status.voltage_v = voltage_sum;
+		battery_status.voltage_filtered_v  = voltage_sum;
+		battery_status.current_a = battery_status.current_filtered_a = (float)(battery_mavlink.current_battery) / 100.0f;
+		battery_status.current_filtered_a = battery_status.current_a;
+		battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
+		battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
+		battery_status.cell_count = cell_count;
+		battery_status.connected = false;
+
+		// Get the battery level thresholds.
+		float bat_emergen_thr;
+		float bat_crit_thr;
+		float bat_low_thr;
+		param_get(_p_bat_emergen_thr, &bat_emergen_thr);
+		param_get(_p_bat_crit_thr, &bat_crit_thr);
+		param_get(_p_bat_low_thr, &bat_low_thr);
+
+		// Set the battery warning based on remaining charge.
+		//  Note: Smallest values must come first in evaluation.
+		if (battery_status.remaining < bat_emergen_thr) {
+			//battery_status.warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
+			battery_status.warning = battery_status_s::BATTERY_WARNING_LOW;
+		} else if (battery_status.remaining < bat_crit_thr) {
+			//battery_status.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+			battery_status.warning = battery_status_s::BATTERY_WARNING_LOW;
+		} else if (battery_status.remaining < bat_low_thr) {
+			battery_status.warning = battery_status_s::BATTERY_WARNING_LOW;
+		}
+
 	}
-
-	battery_status.voltage_v = voltage_sum;
-	battery_status.voltage_filtered_v  = voltage_sum;
-	battery_status.current_a = battery_status.current_filtered_a = (float)(battery_mavlink.current_battery) / 100.0f;
-	battery_status.current_filtered_a = battery_status.current_a;
-	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
-	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
-	battery_status.cell_count = cell_count;
-	battery_status.connected = true;
-
-	// Get the battery level thresholds.
-	float bat_emergen_thr;
-	float bat_crit_thr;
-	float bat_low_thr;
-	param_get(_p_bat_emergen_thr, &bat_emergen_thr);
-	param_get(_p_bat_crit_thr, &bat_crit_thr);
-	param_get(_p_bat_low_thr, &bat_low_thr);
-
-	// Set the battery warning based on remaining charge.
-	//  Note: Smallest values must come first in evaluation.
-	if (battery_status.remaining < bat_emergen_thr) {
-		battery_status.warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
-
-	} else if (battery_status.remaining < bat_crit_thr) {
-		battery_status.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
-
-	} else if (battery_status.remaining < bat_low_thr) {
-		battery_status.warning = battery_status_s::BATTERY_WARNING_LOW;
-	}
-
+	
 	if (_battery_pub == nullptr) {
 		_battery_pub = orb_advertise(ORB_ID(battery_status), &battery_status);
 
@@ -1977,70 +2010,70 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 	mavlink_manual_control_t man;
 	mavlink_msg_manual_control_decode(msg, &man);
 
-	// // Check target
-	// if (man.target != 0 && man.target != _mavlink->get_system_id()) {
-	// 	return;
-	// }
+	// Check target
+	if (man.target != 0 && man.target != _mavlink->get_system_id()) {
+		return;
+	}
 
-	// if (_mavlink->get_manual_input_mode_generation()) {
+	if (_mavlink->get_manual_input_mode_generation()) {
 
-	// 	struct input_rc_s rc = {};
-	// 	rc.timestamp = hrt_absolute_time();
-	// 	rc.timestamp_last_signal = rc.timestamp;
+		struct input_rc_s rc = {};
+		rc.timestamp = hrt_absolute_time();
+		rc.timestamp_last_signal = rc.timestamp;
 
-	// 	rc.channel_count = 8;
-	// 	rc.rc_failsafe = false;
-	// 	rc.rc_lost = false;
-	// 	rc.rc_lost_frame_count = 0;
-	// 	rc.rc_total_frame_count = 1;
-	// 	rc.rc_ppm_frame_length = 0;
-	// 	rc.input_source = input_rc_s::RC_INPUT_SOURCE_MAVLINK;
-	// 	rc.rssi = RC_INPUT_RSSI_MAX;
+		rc.channel_count = 8;
+		rc.rc_failsafe = false;
+		rc.rc_lost = false;
+		rc.rc_lost_frame_count = 0;
+		rc.rc_total_frame_count = 1;
+		rc.rc_ppm_frame_length = 0;
+		rc.input_source = input_rc_s::RC_INPUT_SOURCE_MAVLINK;
+		rc.rssi = RC_INPUT_RSSI_MAX;
 
-	// 	/* roll */
-	// 	rc.values[0] = man.x / 2 + 1500;
-	// 	/* pitch */
-	// 	rc.values[1] = man.y / 2 + 1500;
-	// 	/* yaw */
-	// 	rc.values[2] = man.r / 2 + 1500;
-	// 	/* throttle */
-	// 	rc.values[3] = fminf(fmaxf(man.z / 0.9f + 800, 1000.0f), 2000.0f);
+		/* roll */
+		rc.values[0] = man.x / 2 + 1500;
+		/* pitch */
+		rc.values[1] = man.y / 2 + 1500;
+		/* yaw */
+		rc.values[2] = man.r / 2 + 1500;
+		/* throttle */
+		rc.values[3] = fminf(fmaxf(man.z / 0.9f + 800, 1000.0f), 2000.0f);
 
-	// 	/* decode all switches which fit into the channel mask */
-	// 	unsigned max_switch = (sizeof(man.buttons) * 8);
-	// 	unsigned max_channels = (sizeof(rc.values) / sizeof(rc.values[0]));
+		/* decode all switches which fit into the channel mask */
+		unsigned max_switch = (sizeof(man.buttons) * 8);
+		unsigned max_channels = (sizeof(rc.values) / sizeof(rc.values[0]));
 
-	// 	if (max_switch > (max_channels - 4)) {
-	// 		max_switch = (max_channels - 4);
-	// 	}
+		if (max_switch > (max_channels - 4)) {
+			max_switch = (max_channels - 4);
+		}
 
-	// 	/* fill all channels */
-	// 	for (unsigned i = 0; i < max_switch; i++) {
-	// 		rc.values[i + 4] = decode_switch_pos_n(man.buttons, i);
-	// 	}
+		/* fill all channels */
+		for (unsigned i = 0; i < max_switch; i++) {
+			rc.values[i + 4] = decode_switch_pos_n(man.buttons, i);
+		}
 
-	// 	_mom_switch_state = man.buttons;
+		_mom_switch_state = man.buttons;
 
-	// 	if (_rc_pub == nullptr) {
-	// 		_rc_pub = orb_advertise(ORB_ID(input_rc), &rc);
+		if (_rc_pub == nullptr) {
+			_rc_pub = orb_advertise(ORB_ID(input_rc), &rc);
 
-	// 	} else {
-	// 		orb_publish(ORB_ID(input_rc), _rc_pub, &rc);
-	// 	}
+		} else {
+			orb_publish(ORB_ID(input_rc), _rc_pub, &rc);
+		}
 
-	// } else {
+	} else {
 		struct manual_control_setpoint_s manual = {};
 
 		manual.timestamp = hrt_absolute_time();
-		manual.x = man.x;
-		manual.y = man.y;
-		manual.r = man.r;
-		manual.z = man.z;
+		manual.x = man.x / 1000.0f;
+		manual.y = man.y / 1000.0f;
+		manual.r = man.r / 1000.0f;
+		manual.z = man.z / 1000.0f;
 		manual.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
 
 		int m_inst;
-		orb_publish_auto(ORB_ID(manual_control_setpoint), &_manual_pub, &manual, &m_inst, ORB_PRIO_HIGH);
-	//}
+		orb_publish_auto(ORB_ID(manual_control_setpoint), &_manual_pub, &manual, &m_inst, ORB_PRIO_LOW);
+	}
 }
 
 void MavlinkReceiver::send_manual_overrides (uint16_t values[]){
@@ -2866,9 +2899,9 @@ MavlinkReceiver::receive_thread(void *arg)
 
 			if (_mavlink->get_client_source_initialized()) {
 				/* if read failed, this loop won't execute */
+
 				for (ssize_t i = 0; i < nread; i++) {
 					if (mavlink_parse_char(_mavlink->get_channel(), buf[i], &msg, &_status)) {
-
 						/* check if we received version 2 and request a switch. */
 						if (!(_mavlink->get_status()->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
 							/* this will only switch to proto version 2 if allowed in settings */
@@ -2899,12 +2932,16 @@ MavlinkReceiver::receive_thread(void *arg)
 						/* handle packet with parent object */
 						_mavlink->handle_message(&msg);
 					}
+				} {
+					//_mavlink->send_statustext_critical("fail read");
 				}
 
 				/* count received bytes (nread will be -1 on read error) */
 				if (nread > 0) {
 					_mavlink->count_rxbytes(nread);
 				}
+			} else {
+				//_mavlink->send_statustext_critical("fail read");
 			}
 		}
 
@@ -2968,4 +3005,37 @@ MavlinkReceiver::receive_start(pthread_t *thread, Mavlink *parent)
 	pthread_create(thread, &receiveloop_attr, MavlinkReceiver::start_helper, (void *)parent);
 
 	pthread_attr_destroy(&receiveloop_attr);
+}
+
+void
+MavlinkReceiver::handle_message_stg_status_msg(mavlink_message_t *msg)
+{
+	mavlink_stg_status_t status;
+	mavlink_msg_stg_status_decode(msg, &status);
+
+	struct stg_status_s f;
+	memset(&f, 0, sizeof(f)); 
+
+	f.timestamp = hrt_absolute_time();
+	f.voltage_battery = status.voltage_battery;
+	f.voltage_generator = status.voltage_generator;
+	f.current_battery = status.current_battery;
+	f.current_generator = status.current_generator;
+	f.power_load = status.power_load;
+	f.current_charge = status.current_charge;
+	f.temperarture_bridge = status.temperarture_bridge;
+	f.voltage_drop = status.voltage_drop;
+	f.rpm_cranckshaft = status.rpm_cranckshaft;
+	f.halls_errors = status.halls_errors;
+	f.uptime = status.uptime;
+	f.current_starter = status.current_starter;
+	f.motor_state = status.motor_state;
+	f.stg_errors_bitmask = status.stg_errors_bitmask;
+
+
+	if (_stg_status_msg_pub == nullptr) {
+		_stg_status_msg_pub = orb_advertise(ORB_ID(stg_status), &f);
+	} else {
+		orb_publish(ORB_ID(stg_status), _stg_status_msg_pub, &f);
+	}
 }

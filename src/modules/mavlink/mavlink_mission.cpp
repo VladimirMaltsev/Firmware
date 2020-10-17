@@ -480,7 +480,6 @@ MavlinkMissionManager::send_mission_item_reached(uint16_t seq)
 	PX4_DEBUG("WPM: Send MISSION_ITEM_REACHED reached_seq %u", wp_reached.seq);
 }
 
-
 void
 MavlinkMissionManager::send(const hrt_abstime now)
 {
@@ -505,7 +504,6 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		if (_last_reached != mission_result.seq_reached) {
 			_last_reached = mission_result.seq_reached;
 			_reached_sent_count = 0;
-
 			if (_last_reached >= 0) {
 				send_mission_item_reached((uint16_t)mission_result.seq_reached);
 			}
@@ -536,7 +534,9 @@ MavlinkMissionManager::send(const hrt_abstime now)
 	/* check for timed-out operations */
 	if (_state == MAVLINK_WPM_STATE_GETLIST && (_time_last_sent > 0)
 	    && hrt_elapsed_time(&_time_last_sent) > MAVLINK_MISSION_RETRY_TIMEOUT_DEFAULT) {
-
+		//_mavlink->send_statustext_critical("Mission retry timeout");
+		orb_advert_t	_mavlink_log_pub{nullptr};
+		mavlink_log_critical(&_mavlink_log_pub, "Mission retry timeout %d", _transfer_seq);
 		// try to request item again after timeout
 		send_mission_request(_transfer_partner_sysid, _transfer_partner_compid, _transfer_seq);
 
@@ -544,6 +544,7 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		   && hrt_elapsed_time(&_time_last_recv) > MAVLINK_MISSION_PROTOCOL_TIMEOUT_DEFAULT) {
 
 		_mavlink->send_statustext_critical("Operation timeout");
+		
 
 		PX4_DEBUG("WPM: Last operation (state=%u) timed out, changing state to MAVLINK_WPM_STATE_IDLE", _state);
 

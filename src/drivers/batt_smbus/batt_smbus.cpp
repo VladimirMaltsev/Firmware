@@ -230,7 +230,8 @@ void BATT_SMBUS::cycle()
 
 	// Check if max lifetime voltage delta is greater than allowed.
 	if (_lifetime_max_delta_cell_voltage > BATT_CELL_VOLTAGE_THRESHOLD_FAILED) {
-		new_report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+		//new_report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+		new_report.warning = battery_status_s::BATTERY_WARNING_LOW;
 	}
 
 	// Propagate warning state.
@@ -242,10 +243,11 @@ void BATT_SMBUS::cycle()
 			new_report.warning = battery_status_s::BATTERY_WARNING_LOW;
 
 		} else if (new_report.remaining > _emergency_thr) {
-			new_report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
-
+			//new_report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+			new_report.warning = battery_status_s::BATTERY_WARNING_LOW;
 		} else {
-			new_report.warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
+			//new_report.warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
+			new_report.warning = battery_status_s::BATTERY_WARNING_LOW;
 		}
 	}
 

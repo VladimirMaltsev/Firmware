@@ -32,10 +32,11 @@
  ****************************************************************************/
 
 #include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/tune_control.h>
 #include <modules/px4iofirmware/protocol.h>
 #include <modules/px4iofirmware/px4io.h>
-#include <uORB/topics/landing_gear.h>
 #include <drivers/drv_tone_alarm.h>
+#include <uORB/topics/landing_gear.h>
 #include "FixedwingPositionControl.hpp"
 
 extern "C" __EXPORT int fw_pos_control_l1_main(int argc, char *argv[]);
@@ -86,7 +87,6 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.land_throtTC_scale = param_find("FW_LND_THRTC_SC");
 
     _parameter_handles.loiter_radius = param_find("NAV_LOITER_RAD");
-    _parameter_handles.sys_autostart = param_find("SYS_AUTOSTART");
 
     _parameter_handles.time_const = param_find("FW_T_TIME_CONST");
     _parameter_handles.time_const_throt = param_find("FW_T_THRO_CONST");
@@ -159,7 +159,6 @@ FixedwingPositionControl::parameters_update() {
     param_get(_parameter_handles.land_airspeed_scale, &(_parameters.land_airspeed_scale));
     param_get(_parameter_handles.land_throtTC_scale, &(_parameters.land_throtTC_scale));
     param_get(_parameter_handles.loiter_radius, &(_parameters.loiter_radius));
-    param_get(_parameter_handles.sys_autostart, &(_parameters.sys_autostart));
 
     // VTOL parameter VTOL_TYPE
     if (_parameter_handles.vtol_type != PARAM_INVALID) {
@@ -336,6 +335,56 @@ FixedwingPositionControl::vehicle_command_poll() {
 }
 
 void
+FixedwingPositionControl::engine_status_poll() {
+    bool updated;
+
+    orb_check(_engine_status_sub, &updated);
+
+    if (updated) {
+        orb_copy(ORB_ID(engine_status), _engine_status_sub, &_ess);
+        if (_ess.eng_st == 1)
+            ready_to_fly = false;
+        else if (_ess.eng_st == 2) {
+            ready_to_fly = true;
+        } else if (_ess.eng_st == 3) {
+            is_landing = true; 
+        } else if (!is_landing && _was_in_air && _ess.eng_st == 8 && !enable_engine_restart){
+            _engine_restart_thr_delay = hrt_absolute_time();
+            enable_engine_restart = true;
+
+            px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
+			mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
+
+            mavlink_log_critical(&_mavlink_log_pub, "Engine starter on");
+
+            vehicle_command_s vcmd_stg = {};
+            vcmd_stg.param1 = 1;
+            vcmd_stg.param2 = 0;
+            vcmd_stg.param3 = 0;
+            vcmd_stg.param4 = 0;
+            vcmd_stg.param5 = 0;
+            vcmd_stg.param6 = 0;
+            vcmd_stg.param7 = 0;
+            vcmd_stg.command = 20001;
+            vcmd_stg.target_system = 1;
+            vcmd_stg.target_component = 0;
+            vcmd_stg.source_system = 255;
+            vcmd_stg.source_component = 0;
+            vcmd_stg.from_external = false;
+            vcmd_stg.confirmation = 0;
+
+            orb_advert_t _cmd_pub{nullptr};
+
+            if (_cmd_pub == nullptr) 
+                _cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
+            else 
+                orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
+        }
+    }
+}
+
+void
 FixedwingPositionControl::vehicle_status_poll() {
     bool updated;
 
@@ -380,8 +429,6 @@ FixedwingPositionControl::manual_control_setpoint_poll() {
     orb_check(_manual_control_sub, &manual_updated);
 
     if (manual_updated) {
-        mavlink_log_critical(&_mavlink_log_pub, "Updated manual control");
-        _manual_mode_last_updated = hrt_absolute_time();
         orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
     }
 }
@@ -460,7 +507,22 @@ FixedwingPositionControl::position_setpoint_triplet_poll() {
 
 float
 FixedwingPositionControl::get_demanded_airspeed() {
-    float altctrl_airspeed = constrain(_manual.z, _parameters.airspeed_min, _parameters.airspeed_max);
+    float altctrl_airspeed = 0;
+
+    // neutral throttle corresponds to trim airspeed
+    if (_manual.z < 0.5f) {
+        // lower half of throttle is min to trim airspeed
+        altctrl_airspeed = _parameters.airspeed_min +
+                           (_parameters.airspeed_trim - _parameters.airspeed_min) *
+                           _manual.z * 2;
+
+    } else {
+        // upper half of throttle is trim to max airspeed
+        altctrl_airspeed = _parameters.airspeed_trim +
+                           (_parameters.airspeed_max - _parameters.airspeed_trim) *
+                           (_manual.z * 2 - 1);
+    }
+
     return altctrl_airspeed;
 }
 
@@ -703,9 +765,17 @@ FixedwingPositionControl::get_terrain_altitude_takeoff(float takeoff_alt,
 bool
 FixedwingPositionControl::update_desired_altitude(float dt) {
     /*
-     * if the desired altitude less then 100m keep current altitude
+     * The complete range is -1..+1, so this is 6%
+     * of the up or down range or 3% of the total range.
      */
-    const float deadBand = 100.0f;
+    const float deadBand = 0.06f;
+
+    /*
+     * The correct scaling of the complete range needs
+     * to account for the missing part of the slope
+     * due to the deadband
+     */
+    const float factor = 1.0f - deadBand;
 
     /* Climbout mode sets maximum throttle and pitch up */
     bool climbout_mode = false;
@@ -728,10 +798,25 @@ FixedwingPositionControl::update_desired_altitude(float dt) {
      * the X axis in NED frame, which is pitching down
      */
     if (_manual.x > deadBand) {
-        _hold_alt = _manual.x;
-    } else {
+        /* pitching down */
+        float pitch = -(_manual.x - deadBand) / factor;
+        _hold_alt += (_parameters.max_sink_rate * dt) * pitch;
+        _was_in_deadband = false;
+
+    } else if (_manual.x < -deadBand) {
+        /* pitching up */
+        float pitch = -(_manual.x + deadBand) / factor;
+        _hold_alt += (_parameters.max_climb_rate * dt) * pitch;
+        _was_in_deadband = false;
+        climbout_mode = (pitch > MANUAL_THROTTLE_CLIMBOUT_THRESH);
+
+    } else if (!_was_in_deadband) {
+        /* store altitude at which manual.x was inside deadBand
+         * The aircraft should immediately try to fly at this altitude
+         * as this is what the pilot expects when he moves the stick to the center */
         _hold_alt = _global_pos.alt;
         _althold_epv = _global_pos.epv;
+        _was_in_deadband = true;
     }
 
     if (_vehicle_status.is_vtol) {
@@ -817,8 +902,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             pwm_yaw = air_nav_angle / (float)M_PI_4 * 2;
         else
             pwm_yaw = 0.0f - air_nav_angle / (float)M_PI_4 * 2;
-        act1.control[4] = pwm_yaw;
 
+        act1.control[4] = pwm_yaw;
+        act1.timestamp = hrt_absolute_time();
         if (act_pub1 != nullptr) {
             orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
         } else {
@@ -845,34 +931,6 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     if (_control_mode_current == FW_POSCTRL_MODE_OTHER) {
         /* reset integrators */
         _tecs.reset_state();
-    }
-
-    if (_manual_mode_enabled) {
-        if (hrt_elapsed_time(&_manual_mode_last_updated) > 30e6) {
-            mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
-            _launch_detection_notify = hrt_absolute_time();
-            _manual_mode_enabled = false;
-
-            //-SET-MODE-MISSION-----------------------------
-            vehicle_command_s vcmd_mode = {};
-            vcmd_mode.timestamp = hrt_absolute_time();
-            /* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
-            vcmd_mode.param1 = 157;
-            vcmd_mode.param2 = 4;
-            vcmd_mode.param3 = 4;
-            vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
-            vcmd_mode.target_system = 1;
-            vcmd_mode.target_component = 1;
-            vcmd_mode.source_system = 255;
-            vcmd_mode.source_component = 0;
-            vcmd_mode.confirmation = 0;
-            vcmd_mode.from_external = true;
-
-            orb_advert_t _cmd_pub_mode{nullptr};
-            _cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-
-            //-SET-MODE-END-----------------------------
-        }
     }
 
     if (_control_mode.flag_control_auto_enabled && pos_sp_curr.valid) {
@@ -923,9 +981,6 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             pos_sp_curr.cruising_speed > 0.1f) {
 
             mission_airspeed = pos_sp_curr.cruising_speed;
-            _parameters.airspeed_trim = mission_airspeed;
-            _parameters.airspeed_max = mission_airspeed + 1.f;
-            _parameters.airspeed_min = mission_airspeed - 1.f;
         }
 
         float mission_throttle = _parameters.throttle_cruise;
@@ -942,92 +997,91 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             _att_sp.pitch_body = 0.0f;
 
         } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+// //TURNING LOOP LIGIC START//check if turning is needing
+// 			if (!do_turning_loop) {
+// 				const float dist_curr_prev = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, pos_sp_prev.lat, pos_sp_prev.lon);
+// 				if (dist_curr_prev < 100) {
+// 					mavlink_log_critical(&_mavlink_log_pub, "Start turning loop");
+//                     param_get(_parameter_handles.loiter_radius, &radius);
+// 					do_turning_loop = true;
 
-//TURNING LOOP LIGIC START//check if turning is needing
-			// if (!do_turning_loop) {
-			// 	const float dist_curr_prev = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, pos_sp_prev.lat, pos_sp_prev.lon);
-			// 	if (dist_curr_prev < 150) {
-			// 		mavlink_log_critical(&_mavlink_log_pub, "Start turning loop");
-            //         param_get(_parameter_handles.loiter_radius, &radius);
-			// 		do_turning_loop = true;
+// 					double curr_next_lat = 0;
+// 					double curr_next_lon = 0;
 
-			// 		double curr_next_lat = 0;
-			// 		double curr_next_lon = 0;
+// 					double curr_prev_lat = 0;
+// 					double curr_prev_lon = 0;
 
-			// 		double curr_prev_lat = 0;
-			// 		double curr_prev_lon = 0;
+// 					//pre_enter wp
+// 					loop_pre_enter_lat = pos_sp_prev.lat;
+// 					loop_pre_enter_lon = pos_sp_prev.lon;
+// 					acc_turning_radius = 10;
 
-			// 		//pre_enter wp
-			// 		loop_pre_enter_lat = pos_sp_prev.lat;
-			// 		loop_pre_enter_lon = pos_sp_prev.lon;
-			// 		acc_turning_radius = 10;
+// 					//enter wp
+// 					create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+// 								pos_sp_next.lat, pos_sp_next.lon, radius, &curr_next_lat, &curr_next_lon);
+// 					create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+// 								pos_sp_prev.lat, pos_sp_prev.lon, radius*0.6f, &curr_prev_lat, &curr_prev_lon);
+// 					create_waypoint_from_line_and_dist(curr_prev_lat, curr_prev_lon,
+// 								curr_next_lat, curr_next_lon, -radius*1.1f, &loop_enter_lat, &loop_enter_lon);
 
-			// 		//enter wp
-			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
-			// 					pos_sp_next.lat, pos_sp_next.lon, radius, &curr_next_lat, &curr_next_lon);
-			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
-			// 					pos_sp_prev.lat, pos_sp_prev.lon, radius*0.6f, &curr_prev_lat, &curr_prev_lon);
-			// 		create_waypoint_from_line_and_dist(curr_prev_lat, curr_prev_lon,
-			// 					curr_next_lat, curr_next_lon, -radius*1.1f, &loop_enter_lat, &loop_enter_lon);
+// 					//middle wp
+// 					create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+// 								pos_sp_next.lat, pos_sp_next.lon, -radius, &loop_middle_lat, &loop_middle_lon);
 
-			// 		//middle wp
-			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
-			// 					pos_sp_next.lat, pos_sp_next.lon, -radius, &loop_middle_lat, &loop_middle_lon);
+// 					//pre_exit wp
+// 					create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+// 								pos_sp_next.lat, pos_sp_next.lon, -radius*0.2f, &loop_pre_exit_lat, &loop_pre_exit_lon);
 
-			// 		//pre_exit wp
-			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
-			// 					pos_sp_next.lat, pos_sp_next.lon, -radius*0.2f, &loop_pre_exit_lat, &loop_pre_exit_lon);
+// 					//exit wp
+// 					loop_exit_lat = pos_sp_curr.lat;
+// 					loop_exit_lon = pos_sp_curr.lon;
 
-			// 		//exit wp
-			// 		loop_exit_lat = pos_sp_curr.lat;
-			// 		loop_exit_lon = pos_sp_curr.lon;
+// 				}
+// 			}
 
-			// 	}
-			// }
+// 			if (do_turning_loop){
+// 				switch(loop_waypoint_curr){
+// 					case 0:
+// 						curr_wp = Vector2f((float)loop_pre_enter_lat, (float)loop_pre_enter_lon);
+// 						break;
+// 					case 1:
+// 						curr_wp = Vector2f((float)loop_enter_lat, (float)loop_enter_lon);
+// 						break;
+// 					case 2:
+// 						//moving towards middle point
+// 						prev_wp = Vector2f((float)loop_enter_lat, (float)loop_enter_lon);
+// 						curr_wp = Vector2f((float)loop_middle_lat, (float)loop_middle_lon);
+// 						break;
 
-			// if (do_turning_loop){
-			// 	switch(loop_waypoint_curr){
-			// 		case 0:
-			// 			curr_wp = Vector2f((float)loop_pre_enter_lat, (float)loop_pre_enter_lon);
-			// 			break;
-			// 		case 1:
-			// 			curr_wp = Vector2f((float)loop_enter_lat, (float)loop_enter_lon);
-			// 			break;
-			// 		case 2:
-			// 			//moving towards middle point
-			// 			prev_wp = Vector2f((float)loop_enter_lat, (float)loop_enter_lon);
-			// 			curr_wp = Vector2f((float)loop_middle_lat, (float)loop_middle_lon);
-			// 			break;
-
-			// 		case 3:
-			// 			acc_turning_radius = radius * 0.3f;
-			// 			prev_wp = Vector2f((float)loop_middle_lat, (float)loop_middle_lon);
-			// 			curr_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_pre_exit_lon);
-			// 			break;
-			// 		case 4:
-			// 			prev_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_pre_exit_lon);
-			// 			curr_wp = Vector2f((float)loop_exit_lat, (float)loop_exit_lon);
-			// 			break;
-			// 		default:
-			// 			break;
-			// 	}
+// 					case 3:
+// 						acc_turning_radius = radius * 0.3f;
+// 						prev_wp = Vector2f((float)loop_middle_lat, (float)loop_middle_lon);
+// 						curr_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_pre_exit_lon);
+// 						break;
+// 					case 4:
+// 						prev_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_pre_exit_lon);
+// 						curr_wp = Vector2f((float)loop_exit_lat, (float)loop_exit_lon);
+// 						break;
+// 					default:
+// 						break;
+// 				}
 
 
-			// 	const float dist_xy = get_distance_to_next_waypoint(curr_pos(0), curr_pos(1), curr_wp(0), curr_wp(1));
-			// 	//mavlink_log_critical(&_mavlink_log_pub, "distance = %f", dist_xy);
-			// 	if (dist_xy < acc_turning_radius) {
-			// 		loop_waypoint_curr ++;
-			// 		acc_turning_radius = radius * 0.6f;
-			// 		mavlink_log_critical(&_mavlink_log_pub, "Turning wp %d", loop_waypoint_curr);
-			// 		if (loop_waypoint_curr >= 5){
-			// 			mavlink_log_critical(&_mavlink_log_pub, "Exit turning loop");
-			// 			curr_wp = Vector2f((float)pos_sp_curr.lat, (float)pos_sp_curr.lon);
-			// 			prev_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_exit_lon);
-			// 			loop_waypoint_curr = 0;
-			// 			do_turning_loop = false;
-			// 		}
-			// 	}
-			// }
+// 				const float dist_xy = get_distance_to_next_waypoint(curr_pos(0), curr_pos(1), curr_wp(0), curr_wp(1));
+// 				//mavlink_log_critical(&_mavlink_log_pub, "distance = %f", dist_xy);
+// 				if (dist_xy < acc_turning_radius) {
+// 					loop_waypoint_curr ++;
+// 					acc_turning_radius = radius * 0.6f;
+// 					mavlink_log_critical(&_mavlink_log_pub, "Turning wp %d", loop_waypoint_curr);
+// 					if (loop_waypoint_curr >= 5){
+// 						mavlink_log_critical(&_mavlink_log_pub, "Exit turning loop");
+// 						curr_wp = Vector2f((float)pos_sp_curr.lat, (float)pos_sp_curr.lon);
+// 						prev_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_exit_lon);
+// 						loop_waypoint_curr = 0;
+// 						do_turning_loop = false;
+// 					}
+// 				}
+// 			}
 //TURNING END
             /* waypoint is a plain navigation waypoint */
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
@@ -1100,6 +1154,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
             float wp_distance = get_distance_to_next_waypoint((double) curr_pos(0), (double) curr_pos(1), (double) curr_wp(0),
                                                       (double) curr_wp(1));
+
             control_landing(curr_pos, ground_speed, pos_sp_prev, pos_sp_curr, wp_distance);
 
         } else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF) {
@@ -1136,24 +1191,27 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
             /* reset setpoints from other modes (auto) otherwise we won't
              * level out without new manual input */
-            _att_sp.roll_body = 0;
+            _att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
             _att_sp.yaw_body = 0;
-
-            _manual_mode_last_updated = hrt_absolute_time();
-            _manual_mode_enabled = true;
         }
 
         _control_mode_current = FW_POSCTRL_MODE_POSITION;
 
-        float altctrl_airspeed = _parameters.airspeed_trim;
+        float altctrl_airspeed = get_demanded_airspeed();
 
         /* update desired altitude based on user pitch stick input */
         bool climbout_requested = update_desired_altitude(dt);
 
+        // if we assume that user is taking off then help by demanding altitude setpoint well above ground
+        // and set limit to pitch angle to prevent steering into ground
+        // this will only affect planes and not VTOL
+        float pitch_limit_min = _parameters.pitch_limit_min;
+        do_takeoff_help(&_hold_alt, &pitch_limit_min);
+
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
 
-        if (_vehicle_land_detected.landed) {
+        if (_vehicle_land_detected.landed && (fabsf(_manual.z) < THROTTLE_THRESH)) {
             throttle_max = 0.0f;
         }
 
@@ -1165,20 +1223,70 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                    throttle_max,
                                    _parameters.throttle_cruise,
                                    climbout_requested,
-                                   climbout_requested ? radians(10.0f) : _parameters.pitch_limit_min,
+                                   climbout_requested ? radians(10.0f) : pitch_limit_min,
                                    tecs_status_s::TECS_MODE_NORMAL);
 
-        _hdg_hold_yaw = radians(_manual.r);
-        get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+        /* heading control */
+        if (fabsf(_manual.y) < HDG_HOLD_MAN_INPUT_THRESH &&
+            fabsf(_manual.r) < HDG_HOLD_MAN_INPUT_THRESH) {
 
-        Vector2f prev_wp{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
-        Vector2f curr_wp{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
+            /* heading / roll is zero, lock onto current heading */
+            if (fabsf(_att.yawspeed) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
+                // little yaw movement, lock to current heading
+                _yaw_lock_engaged = true;
 
-        /* populate l1 control setpoint */
-        _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
+            }
 
-        _att_sp.roll_body = _l1_control.get_roll_setpoint();
-        _att_sp.yaw_body = _l1_control.nav_bearing();
+            /* user tries to do a takeoff in heading hold mode, reset the yaw setpoint on every iteration
+              to make sure the plane does not start rolling
+            */
+            if (in_takeoff_situation()) {
+                _hdg_hold_enabled = false;
+                _yaw_lock_engaged = true;
+            }
+
+            if (_yaw_lock_engaged) {
+
+                /* just switched back from non heading-hold to heading hold */
+                if (!_hdg_hold_enabled) {
+                    _hdg_hold_enabled = true;
+                    _hdg_hold_yaw = _yaw;
+
+                    get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+                }
+
+                /* we have a valid heading hold position, are we too close? */
+                float dist = get_distance_to_next_waypoint(_global_pos.lat, _global_pos.lon, _hdg_hold_curr_wp.lat,
+                                                           _hdg_hold_curr_wp.lon);
+
+                if (dist < HDG_HOLD_REACHED_DIST) {
+                    get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, false);
+                }
+
+                Vector2f prev_wp{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
+                Vector2f curr_wp{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
+
+                /* populate l1 control setpoint */
+                _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
+
+                _att_sp.roll_body = _l1_control.get_roll_setpoint();
+                _att_sp.yaw_body = _l1_control.nav_bearing();
+
+                if (in_takeoff_situation()) {
+                    /* limit roll motion to ensure enough lift */
+                    _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-15.0f), radians(15.0f));
+                }
+            }
+        }
+
+        if (!_yaw_lock_engaged || fabsf(_manual.y) >= HDG_HOLD_MAN_INPUT_THRESH ||
+            fabsf(_manual.r) >= HDG_HOLD_MAN_INPUT_THRESH) {
+
+            _hdg_hold_enabled = false;
+            _yaw_lock_engaged = false;
+            _att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
+            _att_sp.yaw_body = 0;
+        }
 
     } else if (_control_mode.flag_control_altitude_enabled) {
         /* ALTITUDE CONTROL: pitch stick moves altitude setpoint, throttle stick sets airspeed */
@@ -1186,23 +1294,26 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         if (_control_mode_current != FW_POSCTRL_MODE_POSITION && _control_mode_current != FW_POSCTRL_MODE_ALTITUDE) {
             /* Need to init because last loop iteration was in a different mode */
             _hold_alt = _global_pos.alt;
-            _manual_mode_last_updated = hrt_absolute_time();
-            _manual_mode_enabled = true;
-            mavlink_log_critical(&_mavlink_log_pub, "manual control enabled");
         }
 
         _control_mode_current = FW_POSCTRL_MODE_ALTITUDE;
 
         /* Get demanded airspeed */
-        float altctrl_airspeed = _parameters.airspeed_trim;
+        float altctrl_airspeed = get_demanded_airspeed();
 
         /* update desired altitude based on user pitch stick input */
         bool climbout_requested = update_desired_altitude(dt);
 
+        // if we assume that user is taking off then help by demanding altitude setpoint well above ground
+        // and set limit to pitch angle to prevent steering into ground
+        // this will only affect planes and not VTOL
+        float pitch_limit_min = _parameters.pitch_limit_min;
+        do_takeoff_help(&_hold_alt, &pitch_limit_min);
+
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
 
-        if (_vehicle_land_detected.landed) {
+        if (_vehicle_land_detected.landed && (fabsf(_manual.z) < THROTTLE_THRESH)) {
             throttle_max = 0.0f;
         }
 
@@ -1214,10 +1325,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                    throttle_max,
                                    _parameters.throttle_cruise,
                                    climbout_requested,
-                                   climbout_requested ? radians(10.0f) : _parameters.pitch_limit_min,
+                                   climbout_requested ? radians(10.0f) : pitch_limit_min,
                                    tecs_status_s::TECS_MODE_NORMAL);
 
-        _att_sp.roll_body = radians(_manual.y);
+        _att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
         _att_sp.yaw_body = 0;
 
     } else {
@@ -1245,7 +1356,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         /* making sure again that the correct thrust is used,
          * without depending on library calls for safety reasons.
            the pre-takeoff throttle and the idle throttle normally map to the same parameter. */
-        _att_sp.thrust_body[0] = _parameters.throttle_idle;
+        if (!ready_to_fly)
+            _att_sp.thrust_body[0] = _parameters.throttle_idle;
+        else 
+            _att_sp.thrust_body[0] = _parameters.throttle_max;
 
     } else if (_control_mode_current == FW_POSCTRL_MODE_AUTO &&
                pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
@@ -1265,81 +1379,23 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         /* Copy thrust and pitch values from tecs */
         if (_vehicle_land_detected.landed) {
             // when we are landed state we want the motor to spin at idle speed
-            _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
+            if (!ready_to_fly)
+                _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
+            else {
+                _att_sp.thrust_body[0] = _parameters.throttle_max;
+            }
         } else {
             _att_sp.thrust_body[0] = min(get_tecs_thrust(), throttle_max);
         }
     }
 
-    detect_unexpected_descent(pos_sp_curr);
+     /* Wait until engin restart */
+    if (enable_engine_restart){
+        _att_sp.thrust_body[0] = _parameters.throttle_idle;
 
-    if (unexpected_descent){
-        _att_sp.thrust_body[0] = 0.f;
-        if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
-            if (_parameters.sys_autostart == 3239) {
-                act1.control[5] = 0.65f;
-            }
-            if (_parameters.sys_autostart == 2101) {
-                act1.control[5] = -0.97f; //parachute drop
-                act1.control[6] = 0.15f; //buffer drop
-            }
-
-            act1.timestamp = hrt_absolute_time();
-            if (act_pub1 != nullptr) {
-                orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-            } else {
-                act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-            }
-            mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
-        }
-        //-SET-MODE-START-----------------------------
-		vehicle_command_s vcmd_mode = {};
-		vcmd_mode.timestamp = hrt_absolute_time();
-		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
-		vcmd_mode.param1 = 29;
-		vcmd_mode.param2 = 4;
-		vcmd_mode.param3 = 3;
-		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
-		vcmd_mode.target_system = 1;
-		vcmd_mode.target_component = 1;
-		vcmd_mode.source_system = 255;
-		vcmd_mode.source_component = 0;
-		vcmd_mode.confirmation = 0;
-		vcmd_mode.from_external = true;
-
-        orb_advert_t _cmd_pub_mode{nullptr};
-		if (_cmd_pub_mode == nullptr) {
-			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		} else {
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		}
-	//-SET-MODE-END-----------------------------
-
-        vehicle_command_s vcmd_disarm = {};
-        vcmd_disarm.timestamp = hrt_absolute_time();
-        vcmd_disarm.param1 = 0;
-        vcmd_disarm.param2 = 0;
-        vcmd_disarm.param3 = 0;
-        vcmd_disarm.param4 = 0;
-        vcmd_disarm.param5 = 0;
-        vcmd_disarm.param6 = 0;
-        vcmd_disarm.param7 = 0;
-        vcmd_disarm.command = 400;
-        vcmd_disarm.target_system = 1;
-        vcmd_disarm.target_component = 1;
-        vcmd_disarm.source_system = 255;
-        vcmd_disarm.source_component = 0;
-        vcmd_disarm.confirmation = 0;
-        vcmd_disarm.from_external = true;
-
-        orb_advert_t _cmd_pub1{nullptr};
-        if (_cmd_pub1 == nullptr) {
-            _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
-
-            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-        } else {
-            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+        if (hrt_elapsed_time(&_engine_restart_thr_delay) > 3e6) {
+            enable_engine_restart = false;
+            mavlink_log_critical(&_mavlink_log_pub, "Engine restarted");
         }
     }
 
@@ -1374,36 +1430,6 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 }
 
 void
-FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_curr){
-    if (!check_unexp_desc){
-        float diff = pos_sp_curr.alt - _global_pos.alt;
-        if (diff > 50.f){
-            check_unexp_desc = true;
-            dangerous_diff = diff;
-            dangerous_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
-            dang_alt_time_det = hrt_absolute_time();
-        }
-    } else {
-        if (hrt_elapsed_time(&dang_alt_time_det) > 3e6) {
-            float diff = pos_sp_curr.alt - _global_pos.alt;
-            float curr_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
-            if (((diff - dangerous_diff) > 25) && (
-                (dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)){
-                //detected an unexpected descent
-                unexpected_descent = true;
-                unexp_desc_time = hrt_absolute_time();
-                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / 3.f);
-            } else
-            {
-                check_unexp_desc = false;
-            }
-
-        }
-
-    }
-}
-
-void
 FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector2f &ground_speed,
                                           const position_setpoint_s &pos_sp_prev,
                                           const position_setpoint_s &pos_sp_curr) {
@@ -1430,6 +1456,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
     // continuously reset launch detection and runway takeoff until armed
     if (!_control_mode.flag_armed) {
+        ready_to_fly = false;
         _launchDetector.reset();
         _launch_detection_state = LAUNCHDETECTION_RES_NONE;
         _launch_detection_notify = 0;
@@ -1484,10 +1511,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
         if (_parameters.climbout_diff > 0.0f && altitude_error > _parameters.climbout_diff) {
-            /* enforce a minimum of 10 degrees pitch up on takeoff, or take parameter */
+            /* enforce a minimum of 6 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(10.0f),
+                                        radians(8.0f),
                                         radians(takeoff_pitch_max_deg),
                                         _parameters.throttle_min,
                                         takeoff_throttle,
@@ -1535,11 +1562,12 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
     float throttle_max = 0.f;
     float throttle_min = 0.f;
 
-    if (wp_distance > 80.f){
+    if (wp_distance > 110.f){
         throttle_land = _parameters.throttle_cruise;
         throttle_max = _parameters.throttle_max;
         throttle_min = _parameters.throttle_min;
-    } else if (wp_distance > 50.f) {
+    } else if (wp_distance > 70.f) {
+        is_landing = true;
         throttle_land = _parameters.throttle_min;
         throttle_max = _parameters.throttle_min;
         throttle_min = _parameters.throttle_min;
@@ -1548,17 +1576,16 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_land = 0.f;
         throttle_max = 0.f;
         throttle_min = 0.f;
+
+        px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+        px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
+        mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
     } else {
 
         if (!parachute_released){
-            if (_parameters.sys_autostart == 3239) {
-                act1.control[5] = 0.65f;
-            }
-            if (_parameters.sys_autostart == 2101) {
-                act1.control[5] = -0.97f; //parachute drop
-                act1.control[6] = 0.15f; //buffer drop
-            }
 
+            act1.control[5] = -0.97f; //parachute drop
+            act1.control[6] = 0.2f; //buffer drop
             act1.timestamp = hrt_absolute_time();
             if (act_pub1 != nullptr) {
                 orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -1567,7 +1594,6 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
             }
             mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
         }
-
         parachute_released = true;
 
     }
@@ -1578,33 +1604,28 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
     }
 
     if (!parachute_dropped && _vehicle_land_detected.landed) {
-        int sys_autostart = 0;
-		param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
-
-        if (sys_autostart == 3239){
-			act1.control[5] = 0.9f;
-		} else if (sys_autostart == 2101) {
-			act1.control[7] = 1.0f;
-			act1.control[6] = 0.0;
-		} else {
-            mavlink_log_critical(&_mavlink_log_pub, "Unsupported airframe");
-		}
+        act1.control[7] = 1.0f;
+		act1.control[6] = 0.0f;
 		act1.timestamp = hrt_absolute_time();
 		if (act_pub1 != nullptr) {
 			orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
 		} else {
 			act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
 		}
+
         mavlink_log_critical(&_mavlink_log_pub, "Parachute is dropped");
         parachute_dropped = true;
 
     //-SET-MODE-START-----------------------------
+        orb_advert_t _cmd_pub_mode{nullptr};
 		vehicle_command_s vcmd_mode = {};
 		vcmd_mode.timestamp = hrt_absolute_time();
+
 		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
 		vcmd_mode.param1 = 29;
 		vcmd_mode.param2 = 4;
 		vcmd_mode.param3 = 3;
+
 		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
 		vcmd_mode.target_system = 1;
 		vcmd_mode.target_component = 1;
@@ -1613,7 +1634,6 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 		vcmd_mode.confirmation = 0;
 		vcmd_mode.from_external = true;
 
-        orb_advert_t _cmd_pub_mode{nullptr};
 		if (_cmd_pub_mode == nullptr) {
 			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
 			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
@@ -1642,24 +1662,24 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         orb_advert_t _cmd_pub1{nullptr};
         if (_cmd_pub1 == nullptr) {
             _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
-
             orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
         } else {
             orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
         }
 
-		// tune_control_s tc = {};
-		// tc.tune_id = 8;
-		// tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
-		// tc.tune_override = 0;
-		// tc.timestamp = hrt_absolute_time();
+		tune_control_s tc = {};
+		orb_advert_t tune_control_pub = nullptr;
+		tc.tune_id = 8;
+		tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
+		tc.tune_override = 0;
+		tc.timestamp = hrt_absolute_time();
+		if (tune_control_pub != nullptr) {
+            orb_publish(ORB_ID(tune_control), tune_control_pub, &tc);
+		} else {
+			tune_control_pub = orb_advertise(ORB_ID(tune_control), &tc);
+		}
 
-        // orb_advert_t tune_control_pub = nullptr;
-		// if (tune_control_pub != nullptr) {
-        //     orb_publish(ORB_ID(tune_control), tune_control_pub, &tc);
-		// } else {
-		// 	tune_control_pub = orb_advertise(ORB_ID(tune_control), &tc);
-		// }
+		
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,
@@ -1726,6 +1746,7 @@ FixedwingPositionControl::run() {
     _params_sub = orb_subscribe(ORB_ID(parameter_update));
     _manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
     _sensor_baro_sub = orb_subscribe(ORB_ID(sensor_baro));
+    _engine_status_sub = orb_subscribe(ORB_ID(engine_status));
 
     /* rate limit position updates to 50 Hz */
     orb_set_interval(_global_pos_sub, 20);
@@ -1811,6 +1832,7 @@ FixedwingPositionControl::run() {
             vehicle_control_mode_poll();
             vehicle_land_detected_poll();
             vehicle_status_poll();
+            engine_status_poll();
 
             Vector2f curr_pos((float) _global_pos.lat, (float) _global_pos.lon);
             Vector2f ground_speed(_global_pos.vel_n, _global_pos.vel_e);

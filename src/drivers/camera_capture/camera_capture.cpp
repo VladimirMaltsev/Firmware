@@ -269,7 +269,7 @@ CameraCapture::set_capture_control(bool enabled)
 
 	int fd = -1;
 
-	fd = open(PX4FMU_DEVICE_PATH, O_RDWR);
+	fd = ::open(PX4FMU_DEVICE_PATH, O_RDWR);
 
 	if (fd < 0) {
 		PX4_ERR("open fail");

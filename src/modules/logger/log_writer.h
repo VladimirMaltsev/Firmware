@@ -92,8 +92,6 @@ public:
 	 */
 	int write_message(LogType type, void *ptr, size_t size, uint64_t dropout_start = 0);
 
-	int write_message_straightforward(LogType type, void *ptr, size_t size);
-
 	/**
 	 * Select a backend, so that future calls to write_message() only write to the selected
 	 * sel_backend, until unselect_write_backend() is called.
