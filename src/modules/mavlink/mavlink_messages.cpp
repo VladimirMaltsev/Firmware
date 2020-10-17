@@ -109,6 +109,7 @@
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/stg_status.h>
 #include <uORB/topics/engine_status.h>
+#include <uORB/topics/camera_log_file.h>
 #include <uORB/uORB.h>
 
 using matrix::wrap_2pi;
@@ -2112,6 +2113,51 @@ public:
 		return (_capture_time > 0) ? MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
 	}
 
+	bool request_message(float param2 = 0.0, float param3 = 0.0, float param4 = 0.0,
+				     float param5 = 0.0, float param6 = 0.0, float param7 = 0.0) override{
+		int id = param2;
+
+
+		struct camera_log_file_s cml;
+		struct camera_capture_s curr_cap;
+
+		orb_copy(ORB_ID(camera_log_file), _cam_file_sub, &cml);
+		FILE* camera_file = fopen((char *)cml.filename, "r");
+
+		char message_in[256];
+		while (fgets(message_in ,256, camera_file)){
+			sscanf(message_in, "%d %f %f %f %f %lf %lf %llu \n", &curr_cap.seq, &curr_cap.q[0], &curr_cap.q[1], &curr_cap.q[2],
+									  &curr_cap.alt, &curr_cap.lat, &curr_cap.lon, &curr_cap.timestamp_utc);
+			if(curr_cap.seq == id){
+				mavlink_camera_image_captured_t msg;
+
+				orb_advert_t	_mavlink_log_pub{nullptr};
+				mavlink_log_info(&_mavlink_log_pub, "%s", message_in);
+
+				msg.time_boot_ms = 0;
+				msg.time_utc = curr_cap.timestamp_utc;
+				msg.camera_id = 1;	// FIXME : get this from uORB
+				msg.lat = curr_cap.lat * 1e7;;
+				msg.lon = curr_cap.lon * 1e7;;
+				msg.alt = curr_cap.alt * 1e3f;
+				msg.relative_alt = 0;
+				msg.q[0] = curr_cap.q[0];
+				msg.q[1] = curr_cap.q[1];
+				msg.q[2] = curr_cap.q[2];
+				msg.q[3] = 1912;
+				msg.image_index = curr_cap.seq;
+				msg.capture_result = 1;
+				msg.file_url[0] = '\0';
+
+				mavlink_msg_camera_image_captured_send_struct(_mavlink->get_channel(), &msg);
+				fclose (camera_file);
+				return true;
+			}
+		}
+		fclose (camera_file);
+		return false;
+	}
+
 private:
 	MavlinkOrbSubscription *_capture_sub;
 	uint64_t _capture_time;
@@ -2125,6 +2171,7 @@ protected:
 		_capture_sub(_mavlink->add_orb_subscription(ORB_ID(camera_capture))),
 		_capture_time(0)
 	{}
+	int _cam_file_sub{orb_subscribe(ORB_ID(camera_log_file))};
 
 	bool send(const hrt_abstime t)
 	{
@@ -4883,12 +4930,12 @@ protected:
 
     bool send(const hrt_abstime t)
     {
-		
+
         struct stg_status_s _stg_status = {};    //make sure stg_status_struct_s is the definition of your uORB topic
 
         if (_sub->update(&_stg_status_time, &_stg_status)) {
            	 mavlink_stg_status_t _msg_stg_status;  //make sure mavlink_stg_status_t is the definition of your custom MAVLink message
-			
+
 			_msg_stg_status.voltage_battery = _stg_status.voltage_battery;
 			_msg_stg_status.voltage_generator = _stg_status.voltage_generator;
 			_msg_stg_status.current_battery = _stg_status.current_battery;
@@ -4920,7 +4967,7 @@ protected:
 					orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
 				}
 			}
-        
+
 			// /* battery status message with higher resolution */
 			// mavlink_battery_status_t bat_msg = {};
 
@@ -4938,12 +4985,12 @@ protected:
 			// for (unsigned int i = 0; i < (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0])); i++) {
 			// 	bat_msg.voltages[i] = _stg_status.voltage_generator;
 			// }
-			
-			
+
+
 
 			// mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
 
-		
+
 		}
 
         return true;
@@ -4988,22 +5035,22 @@ private:
 
 protected:
     explicit MavlinkStreamAdcReport(Mavlink *mavlink) : MavlinkStream(mavlink),
-        _sub(_mavlink->add_orb_subscription(ORB_ID(adc_report))), 
+        _sub(_mavlink->add_orb_subscription(ORB_ID(adc_report))),
         _adc_report_time(0)
     {}
 
     bool send(const hrt_abstime t)
     {
-		
-        struct adc_report_s _adc_report = {};   
+
+        struct adc_report_s _adc_report = {};
 
         if (_sub->update(&_adc_report_time, &_adc_report)) {
-           	 mavlink_adc_report_t _msg_adc_report;  
+           	 mavlink_adc_report_t _msg_adc_report;
 
 			for (int i = 0; i < 12; i ++){
 				_msg_adc_report.channel_id[i] = _adc_report.channel_id[i];
 				_msg_adc_report.channel_value[i] = _adc_report.channel_value[i];
-			}	
+			}
 			mavlink_msg_adc_report_send_struct(_mavlink->get_channel(), &_msg_adc_report);
 		}
 
