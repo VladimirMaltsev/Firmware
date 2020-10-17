@@ -1223,43 +1223,40 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		/* ALTITUDE CONTROL: pitch stick moves altitude setpoint, throttle stick sets airspeed */
 
 		if (_control_mode_current != FW_POSCTRL_MODE_POSITION && _control_mode_current != FW_POSCTRL_MODE_ALTITUDE) {
-			/* Need to init because last loop iteration was in a different mode */
-			_hold_alt = _global_pos.alt;
+		/* Need to init because last loop iteration was in a different mode */
+		_hold_alt = _global_pos.alt;
+		_manual_mode_last_updated = hrt_absolute_time();
+		_manual_mode_enabled = true;
+		mavlink_log_critical(&_mavlink_log_pub, "manual control enabled");
 		}
 
 		_control_mode_current = FW_POSCTRL_MODE_ALTITUDE;
 
 		/* Get demanded airspeed */
-		float altctrl_airspeed = get_demanded_airspeed();
+		float altctrl_airspeed = _parameters.airspeed_trim;
 
 		/* update desired altitude based on user pitch stick input */
-		bool climbout_requested = update_desired_altitude(dt_p);
-
-		// if we assume that user is taking off then help by demanding altitude setpoint well above ground
-		// and set limit to pitch angle to prevent steering into ground
-		// this will only affect planes and not VTOL
-		float pitch_limit_min = _parameters.pitch_limit_min;
-		do_takeoff_help(&_hold_alt, &pitch_limit_min);
+		bool climbout_requested = update_desired_altitude(dt);
 
 		/* throttle limiting */
 		throttle_max = _parameters.throttle_max;
 
-		if (_vehicle_land_detected.landed && (fabsf(_manual.z) < THROTTLE_THRESH)) {
-			throttle_max = 0.0f;
+		if (_vehicle_land_detected.landed) {
+		throttle_max = 0.0f;
 		}
 
 		tecs_update_pitch_throttle(_hold_alt,
-					   altctrl_airspeed,
-					   radians(_parameters.pitch_limit_min),
-					   radians(_parameters.pitch_limit_max),
-					   _parameters.throttle_min,
-					   throttle_max,
-					   _parameters.throttle_cruise,
-					   climbout_requested,
-					   climbout_requested ? radians(10.0f) : pitch_limit_min,
-					   tecs_status_s::TECS_MODE_NORMAL);
+					altctrl_airspeed,
+					radians(_parameters.pitch_limit_min),
+					radians(_parameters.pitch_limit_max),
+					_parameters.throttle_min,
+					throttle_max,
+					_parameters.throttle_cruise,
+					climbout_requested,
+					climbout_requested ? radians(10.0f) : _parameters.pitch_limit_min,
+					tecs_status_s::TECS_MODE_NORMAL);
 
-		_att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
+		_att_sp.roll_body = radians(_manual.y);
 		_att_sp.yaw_body = 0;
 
 	} else {
