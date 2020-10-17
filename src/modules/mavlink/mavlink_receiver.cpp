@@ -333,7 +333,9 @@ MavlinkReceiver::evaluate_target_ok(int command, int target_system, int target_c
 		/* broadcast and ignore component */
 		target_ok = (target_system == 0) || (target_system == mavlink_system.sysid);
 		break;
-
+	case MAV_CMD_REQUEST_MESSAGE:
+		target_ok = true;
+		break;
 	default:
 		target_ok = (target_system == mavlink_system.sysid) && ((target_component == mavlink_system.compid)
 				|| (target_component == MAV_COMP_ID_ALL));
@@ -599,7 +601,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		param_set(param_find("FW_THR_MAX"), &thr_100);
 
 		int enable_airspeed = 0;
-        param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);	
+        param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 	} else if (cmd_mavlink.command == MAV_CMD_DROP_BUFFER_PARACHUTE){
 
 		act1.control[7] = 1.0f;
@@ -646,11 +648,11 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		vcmd_stg.from_external = false;
 		if (vehicle_command.param1 == 1)
 			mavlink_log_critical(&_mavlink_log_pub, "Starter ON");
-		if (_cmd_pub == nullptr) 
+		if (_cmd_pub == nullptr)
 			_cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
-		else 
+		else
 			orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
-		
+
 	} else if (cmd_mavlink.command == MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES) {
 		/* send autopilot version message */
 		_mavlink->send_autopilot_capabilites();
@@ -677,6 +679,14 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		if ((int)(cmd_mavlink.param2 + 0.5f) == 1) {
 			send_storage_information(cmd_mavlink.param1 + 0.5f);
 		}
+	} else if (cmd_mavlink.command == MAV_CMD_REQUEST_MESSAGE) {
+
+		uint16_t message_id = (uint16_t)roundf(vehicle_command.param1);
+
+		mavlink_log_critical(&_mavlink_log_pub, "mess_id = %d, index = %d", message_id, vehicle_command.param2);
+		result = handle_request_message_command(message_id,
+							vehicle_command.param2, vehicle_command.param3, vehicle_command.param4,
+							vehicle_command.param5, vehicle_command.param6, vehicle_command.param7);
 
 	} else {
 
@@ -720,6 +730,20 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 
 	if (send_ack) {
 		acknowledge(msg->sysid, msg->compid, cmd_mavlink.command, result);
+	}
+}
+
+uint8_t MavlinkReceiver::handle_request_message_command(uint16_t message_id, float param2, float param3, float param4,
+		float param5, float param6, float param7)
+{
+	for (const auto &stream : _mavlink->get_streams()) {
+		if (stream->get_id() == message_id) {
+
+			if (message_id == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED){
+				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
+			}
+			break;
+		}
 	}
 }
 
@@ -1691,7 +1715,7 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 	battery_status.timestamp = hrt_absolute_time();
 
 	if (msg->msgid == MAVLINK_MSG_ID_STG_STATUS) {
-		
+
 		mavlink_stg_status_t status;
 		mavlink_msg_stg_status_decode(msg, &status);
 
@@ -1718,7 +1742,7 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 		// external battery measurements
 		mavlink_battery_status_t battery_mavlink;
 		mavlink_msg_battery_status_decode(msg, &battery_mavlink);
-	
+
 		while (battery_mavlink.voltages[cell_count] < UINT16_MAX && cell_count < 10) {
 			voltage_sum += (float)(battery_mavlink.voltages[cell_count]) / 1000.0f;
 			cell_count++;
@@ -1754,7 +1778,7 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 		}
 
 	}
-	
+
 	if (_battery_pub == nullptr) {
 		_battery_pub = orb_advertise(ORB_ID(battery_status), &battery_status);
 
@@ -3014,7 +3038,7 @@ MavlinkReceiver::handle_message_stg_status_msg(mavlink_message_t *msg)
 	mavlink_msg_stg_status_decode(msg, &status);
 
 	struct stg_status_s f;
-	memset(&f, 0, sizeof(f)); 
+	memset(&f, 0, sizeof(f));
 
 	f.timestamp = hrt_absolute_time();
 	f.voltage_battery = status.voltage_battery;
