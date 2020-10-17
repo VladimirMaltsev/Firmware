@@ -940,6 +940,95 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 			_att_sp.pitch_body = 0.0f;
 
 		} else if (pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+
+//TURNING LOOP LIGIC START
+
+			//check if turning is needing
+			// if (!do_turning_loop) {
+			// 	const float dist_curr_prev = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, pos_sp_prev.lat, pos_sp_prev.lon);
+			// 	if (dist_curr_prev < 150) {
+			// 		mavlink_log_critical(&_mavlink_log_pub, "Start turning loop");
+            		//         param_get(_parameter_handles.loiter_radius, &radius);
+			// 		do_turning_loop = true;
+
+			// 		double curr_next_lat = 0;
+			// 		double curr_next_lon = 0;
+
+			// 		double curr_prev_lat = 0;
+			// 		double curr_prev_lon = 0;
+
+			// 		//pre_enter wp
+			// 		loop_pre_enter_lat = pos_sp_prev.lat;
+			// 		loop_pre_enter_lon = pos_sp_prev.lon;
+			// 		acc_turning_radius = 10;
+
+			// 		//enter wp
+			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+			// 					pos_sp_next.lat, pos_sp_next.lon, radius, &curr_next_lat, &curr_next_lon);
+			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+			// 					pos_sp_prev.lat, pos_sp_prev.lon, radius*0.6f, &curr_prev_lat, &curr_prev_lon);
+			// 		create_waypoint_from_line_and_dist(curr_prev_lat, curr_prev_lon,
+			// 					curr_next_lat, curr_next_lon, -radius*1.1f, &loop_enter_lat, &loop_enter_lon);
+
+			// 		//middle wp
+			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+			// 					pos_sp_next.lat, pos_sp_next.lon, -radius, &loop_middle_lat, &loop_middle_lon);
+
+			// 		//pre_exit wp
+			// 		create_waypoint_from_line_and_dist(pos_sp_curr.lat, pos_sp_curr.lon,
+			// 					pos_sp_next.lat, pos_sp_next.lon, -radius*0.2f, &loop_pre_exit_lat, &loop_pre_exit_lon);
+
+			// 		//exit wp
+			// 		loop_exit_lat = pos_sp_curr.lat;
+			// 		loop_exit_lon = pos_sp_curr.lon;
+
+			// 	}
+			// }
+
+			// if (do_turning_loop){
+			// 	switch(loop_waypoint_curr){
+			// 		case 0:
+			// 			curr_wp = Vector2f((float)loop_pre_enter_lat, (float)loop_pre_enter_lon);
+			// 			break;
+			// 		case 1:
+			// 			curr_wp = Vector2f((float)loop_enter_lat, (float)loop_enter_lon);
+			// 			break;
+			// 		case 2:
+			// 			//moving towards middle point
+			// 			prev_wp = Vector2f((float)loop_enter_lat, (float)loop_enter_lon);
+			// 			curr_wp = Vector2f((float)loop_middle_lat, (float)loop_middle_lon);
+			// 			break;
+
+			// 		case 3:
+			// 			acc_turning_radius = radius * 0.3f;
+			// 			prev_wp = Vector2f((float)loop_middle_lat, (float)loop_middle_lon);
+			// 			curr_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_pre_exit_lon);
+			// 			break;
+			// 		case 4:
+			// 			prev_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_pre_exit_lon);
+			// 			curr_wp = Vector2f((float)loop_exit_lat, (float)loop_exit_lon);
+			// 			break;
+			// 		default:
+			// 			break;
+			// 	}
+
+
+			// 	const float dist_xy = get_distance_to_next_waypoint(curr_pos(0), curr_pos(1), curr_wp(0), curr_wp(1));
+			// 	//mavlink_log_critical(&_mavlink_log_pub, "distance = %f", dist_xy);
+			// 	if (dist_xy < acc_turning_radius) {
+			// 		loop_waypoint_curr ++;
+			// 		acc_turning_radius = radius * 0.6f;
+			// 		mavlink_log_critical(&_mavlink_log_pub, "Turning wp %d", loop_waypoint_curr);
+			// 		if (loop_waypoint_curr >= 5){
+			// 			mavlink_log_critical(&_mavlink_log_pub, "Exit turning loop");
+			// 			curr_wp = Vector2f((float)pos_sp_curr.lat, (float)pos_sp_curr.lon);
+			// 			prev_wp = Vector2f((float)loop_pre_exit_lat, (float)loop_exit_lon);
+			// 			loop_waypoint_curr = 0;
+			// 			do_turning_loop = false;
+			// 		}
+			// 	}
+			// }
+//TURNING END
 			/* waypoint is a plain navigation waypoint */
 			_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, nav_speed_2d);
 			_att_sp.roll_body = _l1_control.get_roll_setpoint();
