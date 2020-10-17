@@ -128,6 +128,7 @@ SDP3X::collect()
 	int ret = transfer(nullptr, 0, &val[0], sizeof(val));
 
 	if (ret != PX4_OK) {
+		init_sdp3x();
 		perf_count(_comms_errors);
 		return ret;
 	}
