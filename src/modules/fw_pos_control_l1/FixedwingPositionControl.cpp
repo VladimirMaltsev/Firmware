@@ -347,7 +347,7 @@ FixedwingPositionControl::engine_status_poll() {
         else if (_ess.eng_st == 2) {
             ready_to_fly = true;
         } else if (_ess.eng_st == 3) {
-            is_landing = true; 
+            is_landing = true;
         } else if (!is_landing && _was_in_air && _ess.eng_st == 8 && !enable_engine_restart){
             _engine_restart_thr_delay = hrt_absolute_time();
             enable_engine_restart = true;
@@ -376,9 +376,9 @@ FixedwingPositionControl::engine_status_poll() {
 
             orb_advert_t _cmd_pub{nullptr};
 
-            if (_cmd_pub == nullptr) 
+            if (_cmd_pub == nullptr)
                 _cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
-            else 
+            else
                 orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
         }
     }
@@ -933,6 +933,34 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _tecs.reset_state();
     }
 
+    if (_manual_mode_enabled) {
+        if (hrt_elapsed_time(&_manual_mode_last_updated) > 30e6) {
+            mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
+            _launch_detection_notify = hrt_absolute_time();
+            _manual_mode_enabled = false;
+
+            //-SET-MODE-MISSION-----------------------------
+            vehicle_command_s vcmd_mode = {};
+            vcmd_mode.timestamp = hrt_absolute_time();
+            /* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
+            vcmd_mode.param1 = 157;
+            vcmd_mode.param2 = 4;
+            vcmd_mode.param3 = 4;
+            vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
+            vcmd_mode.target_system = 1;
+            vcmd_mode.target_component = 1;
+            vcmd_mode.source_system = 255;
+            vcmd_mode.source_component = 0;
+            vcmd_mode.confirmation = 0;
+            vcmd_mode.from_external = true;
+
+            orb_advert_t _cmd_pub_mode{nullptr};
+            _cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
+
+            //-SET-MODE-END-----------------------------
+        }
+    }
+
     if (_control_mode.flag_control_auto_enabled && pos_sp_curr.valid) {
         /* AUTONOMOUS FLIGHT */
 
@@ -981,6 +1009,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             pos_sp_curr.cruising_speed > 0.1f) {
 
             mission_airspeed = pos_sp_curr.cruising_speed;
+            _parameters.airspeed_trim = mission_airspeed;
+            _parameters.airspeed_max = mission_airspeed + 1.f;
+            _parameters.airspeed_min = mission_airspeed - 1.f;
         }
 
         float mission_throttle = _parameters.throttle_cruise;
@@ -1191,27 +1222,24 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
             /* reset setpoints from other modes (auto) otherwise we won't
              * level out without new manual input */
-            _att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
+            _att_sp.roll_body = 0;
             _att_sp.yaw_body = 0;
+
+            _manual_mode_last_updated = hrt_absolute_time();
+            _manual_mode_enabled = true;
         }
 
         _control_mode_current = FW_POSCTRL_MODE_POSITION;
 
-        float altctrl_airspeed = get_demanded_airspeed();
+        float altctrl_airspeed = _parameters.airspeed_trim;
 
         /* update desired altitude based on user pitch stick input */
         bool climbout_requested = update_desired_altitude(dt);
 
-        // if we assume that user is taking off then help by demanding altitude setpoint well above ground
-        // and set limit to pitch angle to prevent steering into ground
-        // this will only affect planes and not VTOL
-        float pitch_limit_min = _parameters.pitch_limit_min;
-        do_takeoff_help(&_hold_alt, &pitch_limit_min);
-
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
 
-        if (_vehicle_land_detected.landed && (fabsf(_manual.z) < THROTTLE_THRESH)) {
+        if (_vehicle_land_detected.landed) {
             throttle_max = 0.0f;
         }
 
@@ -1223,70 +1251,20 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                    throttle_max,
                                    _parameters.throttle_cruise,
                                    climbout_requested,
-                                   climbout_requested ? radians(10.0f) : pitch_limit_min,
+                                   climbout_requested ? radians(10.0f) : _parameters.pitch_limit_min,
                                    tecs_status_s::TECS_MODE_NORMAL);
 
-        /* heading control */
-        if (fabsf(_manual.y) < HDG_HOLD_MAN_INPUT_THRESH &&
-            fabsf(_manual.r) < HDG_HOLD_MAN_INPUT_THRESH) {
+        _hdg_hold_yaw = radians(_manual.r);
+        get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
 
-            /* heading / roll is zero, lock onto current heading */
-            if (fabsf(_att.yawspeed) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
-                // little yaw movement, lock to current heading
-                _yaw_lock_engaged = true;
+        Vector2f prev_wp{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
+        Vector2f curr_wp{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
 
-            }
+        /* populate l1 control setpoint */
+        _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
 
-            /* user tries to do a takeoff in heading hold mode, reset the yaw setpoint on every iteration
-              to make sure the plane does not start rolling
-            */
-            if (in_takeoff_situation()) {
-                _hdg_hold_enabled = false;
-                _yaw_lock_engaged = true;
-            }
-
-            if (_yaw_lock_engaged) {
-
-                /* just switched back from non heading-hold to heading hold */
-                if (!_hdg_hold_enabled) {
-                    _hdg_hold_enabled = true;
-                    _hdg_hold_yaw = _yaw;
-
-                    get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
-                }
-
-                /* we have a valid heading hold position, are we too close? */
-                float dist = get_distance_to_next_waypoint(_global_pos.lat, _global_pos.lon, _hdg_hold_curr_wp.lat,
-                                                           _hdg_hold_curr_wp.lon);
-
-                if (dist < HDG_HOLD_REACHED_DIST) {
-                    get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, false);
-                }
-
-                Vector2f prev_wp{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
-                Vector2f curr_wp{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
-
-                /* populate l1 control setpoint */
-                _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
-
-                _att_sp.roll_body = _l1_control.get_roll_setpoint();
-                _att_sp.yaw_body = _l1_control.nav_bearing();
-
-                if (in_takeoff_situation()) {
-                    /* limit roll motion to ensure enough lift */
-                    _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-15.0f), radians(15.0f));
-                }
-            }
-        }
-
-        if (!_yaw_lock_engaged || fabsf(_manual.y) >= HDG_HOLD_MAN_INPUT_THRESH ||
-            fabsf(_manual.r) >= HDG_HOLD_MAN_INPUT_THRESH) {
-
-            _hdg_hold_enabled = false;
-            _yaw_lock_engaged = false;
-            _att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
-            _att_sp.yaw_body = 0;
-        }
+        _att_sp.roll_body = _l1_control.get_roll_setpoint();
+        _att_sp.yaw_body = _l1_control.nav_bearing();
 
     } else if (_control_mode.flag_control_altitude_enabled) {
         /* ALTITUDE CONTROL: pitch stick moves altitude setpoint, throttle stick sets airspeed */
@@ -1294,26 +1272,23 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         if (_control_mode_current != FW_POSCTRL_MODE_POSITION && _control_mode_current != FW_POSCTRL_MODE_ALTITUDE) {
             /* Need to init because last loop iteration was in a different mode */
             _hold_alt = _global_pos.alt;
+            _manual_mode_last_updated = hrt_absolute_time();
+            _manual_mode_enabled = true;
+            mavlink_log_critical(&_mavlink_log_pub, "manual control enabled");
         }
 
         _control_mode_current = FW_POSCTRL_MODE_ALTITUDE;
 
         /* Get demanded airspeed */
-        float altctrl_airspeed = get_demanded_airspeed();
+        float altctrl_airspeed = _parameters.airspeed_trim;
 
         /* update desired altitude based on user pitch stick input */
         bool climbout_requested = update_desired_altitude(dt);
 
-        // if we assume that user is taking off then help by demanding altitude setpoint well above ground
-        // and set limit to pitch angle to prevent steering into ground
-        // this will only affect planes and not VTOL
-        float pitch_limit_min = _parameters.pitch_limit_min;
-        do_takeoff_help(&_hold_alt, &pitch_limit_min);
-
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
 
-        if (_vehicle_land_detected.landed && (fabsf(_manual.z) < THROTTLE_THRESH)) {
+        if (_vehicle_land_detected.landed) {
             throttle_max = 0.0f;
         }
 
@@ -1325,10 +1300,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                    throttle_max,
                                    _parameters.throttle_cruise,
                                    climbout_requested,
-                                   climbout_requested ? radians(10.0f) : pitch_limit_min,
+                                   climbout_requested ? radians(10.0f) : _parameters.pitch_limit_min,
                                    tecs_status_s::TECS_MODE_NORMAL);
 
-        _att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
+        _att_sp.roll_body = radians(_manual.y);
         _att_sp.yaw_body = 0;
 
     } else {
@@ -1358,7 +1333,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
            the pre-takeoff throttle and the idle throttle normally map to the same parameter. */
         if (!ready_to_fly)
             _att_sp.thrust_body[0] = _parameters.throttle_idle;
-        else 
+        else
             _att_sp.thrust_body[0] = _parameters.throttle_max;
 
     } else if (_control_mode_current == FW_POSCTRL_MODE_AUTO &&
@@ -1398,6 +1373,74 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             mavlink_log_critical(&_mavlink_log_pub, "Engine restarted");
         }
     }
+
+    detect_unexpected_descent(pos_sp_curr);
+
+    if (unexpected_descent){
+        _att_sp.thrust_body[0] = 0.f;
+        if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
+
+            act1.control[5] = -0.97f; //parachute drop
+            act1.control[6] = 0.2f; //buffer drop
+            act1.timestamp = hrt_absolute_time();
+            if (act_pub1 != nullptr) {
+                orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+            } else {
+                act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+            }
+            mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+        }
+        //-SET-MODE-START-----------------------------
+		vehicle_command_s vcmd_mode = {};
+		vcmd_mode.timestamp = hrt_absolute_time();
+		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
+		vcmd_mode.param1 = 29;
+		vcmd_mode.param2 = 2;
+		vcmd_mode.param3 = 0;
+		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
+		vcmd_mode.target_system = 1;
+		vcmd_mode.target_component = 1;
+		vcmd_mode.source_system = 255;
+		vcmd_mode.source_component = 0;
+		vcmd_mode.confirmation = 0;
+		vcmd_mode.from_external = true;
+
+        orb_advert_t _cmd_pub_mode{nullptr};
+		if (_cmd_pub_mode == nullptr) {
+			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
+		} else {
+			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
+		}
+	//-SET-MODE-END-----------------------------
+
+        vehicle_command_s vcmd_disarm = {};
+        vcmd_disarm.timestamp = hrt_absolute_time();
+        vcmd_disarm.param1 = 0;
+        vcmd_disarm.param2 = 0;
+        vcmd_disarm.param3 = 0;
+        vcmd_disarm.param4 = 0;
+        vcmd_disarm.param5 = 0;
+        vcmd_disarm.param6 = 0;
+        vcmd_disarm.param7 = 0;
+        vcmd_disarm.command = 400;
+        vcmd_disarm.target_system = 1;
+        vcmd_disarm.target_component = 1;
+        vcmd_disarm.source_system = 255;
+        vcmd_disarm.source_component = 0;
+        vcmd_disarm.confirmation = 0;
+        vcmd_disarm.from_external = true;
+
+        orb_advert_t _cmd_pub1{nullptr};
+        if (_cmd_pub1 == nullptr) {
+            _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
+
+            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+        } else {
+            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+        }
+    }
+
 
     // decide when to use pitch setpoint from TECS because in some cases pitch
     // setpoint is generated by other means
@@ -1679,7 +1722,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 			tune_control_pub = orb_advertise(ORB_ID(tune_control), &tc);
 		}
 
-		
+
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,
