@@ -470,7 +470,6 @@ Navigator::run()
 				if (cmd.param2 > FLT_EPSILON) {
 					// XXX not differentiating ground and airspeed yet
 					set_cruising_speed(cmd.param2);
-
 				} else {
 					set_cruising_speed();
 
