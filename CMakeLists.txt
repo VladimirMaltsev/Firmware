@@ -589,6 +589,8 @@ set(CPACK_SET_DESTDIR "OFF")
 
 if ("${CMAKE_SYSTEM}" MATCHES "Linux")
 	set(CPACK_GENERATOR "TBZ2")
+	set(cxx_warnings "${cxx_warnings} -Wno-error=format-overflow")
+        set(cxx_warnings "${cxx_warnings} -Wno-format-overflow")
 	find_program(DPKG_PROGRAM dpkg)
 	if (EXISTS ${DPKG_PROGRAM})
 		list (APPEND CPACK_GENERATOR "DEB")
