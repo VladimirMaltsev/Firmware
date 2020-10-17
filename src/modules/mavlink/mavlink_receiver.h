@@ -82,6 +82,7 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
+#include <uORB/topics/camera_log_file.h>
 
 #include "mavlink_ftp.h"
 #include "mavlink_log_handler.h"
@@ -117,6 +118,9 @@ public:
 	static void *start_helper(void *context);
 
 private:
+	int lastOverride = 0;
+	bool hasOverrides = false;
+	bool remoteMode = false;
 
 	void acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result);
 
@@ -126,6 +130,10 @@ private:
 	template<class T>
 	void handle_message_command_both(mavlink_message_t *msg, const T &cmd_mavlink,
 					 const vehicle_command_s &vehicle_command);
+
+	uint8_t handle_request_message_command(uint16_t message_id, float param2 = 0.0f, float param3 = 0.0f,
+					       float param4 = 0.0f,
+					       float param5 = 0.0f, float param6 = 0.0f, float param7 = 0.0f);
 
 	void handle_message(mavlink_message_t *msg);
 	void handle_message_adsb_vehicle(mavlink_message_t *msg);
@@ -197,6 +205,8 @@ private:
 
 	void send_storage_information(int storage_id);
 
+	void send_manual_overrides (uint16_t values[]);
+
 	Mavlink	*_mavlink;
 
 	MavlinkFTP			_mavlink_ftp;
@@ -206,6 +216,7 @@ private:
 	MavlinkParametersManager	_parameters_manager;
 
 	mavlink_status_t _status{}; ///< receiver status, used for mavlink_parse_char()
+	orb_advert_t	_mavlink_log_pub{nullptr};
 
 	map_projection_reference_s _hil_local_proj_ref {};
 	offboard_control_mode_s _offboard_control_mode{};
@@ -255,11 +266,25 @@ private:
 	orb_advert_t _transponder_report_pub{nullptr};
 	orb_advert_t _visual_odometry_pub{nullptr};
 
+	orb_advert_t    act_pub{nullptr};
+    	orb_advert_t    act_pub0{nullptr};
+    	orb_advert_t    act_pub1{nullptr};
+    	orb_advert_t    act_pub2{nullptr};
+    	orb_advert_t    act_pub3{nullptr};
+
+
+	struct actuator_controls_s act = {};
+    	struct actuator_controls_s act0 = {};
+    	struct actuator_controls_s act1 = {};
+    	struct actuator_controls_s act2 = {};
+    	struct actuator_controls_s act3 = {};
+
 	static constexpr int _gps_inject_data_queue_size{6};
 
 	int _actuator_armed_sub{orb_subscribe(ORB_ID(actuator_armed))};
 	int _control_mode_sub{orb_subscribe(ORB_ID(vehicle_control_mode))};
 	int _vehicle_attitude_sub{orb_subscribe(ORB_ID(vehicle_attitude))};
+	int _cam_file_sub{orb_subscribe(ORB_ID(camera_log_file))};
 
 	int _orb_class_instance{-1};
 
