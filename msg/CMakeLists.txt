@@ -40,6 +40,7 @@ set(msg_files
 	airspeed.msg
 	battery_status.msg
 	camera_capture.msg
+	camera_log_file.msg
 	camera_trigger.msg
 	collision_report.msg
 	collision_constraints.msg
