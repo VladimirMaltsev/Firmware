@@ -2034,70 +2034,70 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 	mavlink_manual_control_t man;
 	mavlink_msg_manual_control_decode(msg, &man);
 
-	// Check target
-	if (man.target != 0 && man.target != _mavlink->get_system_id()) {
-		return;
-	}
+	// // Check target
+	// if (man.target != 0 && man.target != _mavlink->get_system_id()) {
+	// 	return;
+	// }
 
-	if (_mavlink->get_manual_input_mode_generation()) {
+	// if (_mavlink->get_manual_input_mode_generation()) {
 
-		struct input_rc_s rc = {};
-		rc.timestamp = hrt_absolute_time();
-		rc.timestamp_last_signal = rc.timestamp;
+	// 	struct input_rc_s rc = {};
+	// 	rc.timestamp = hrt_absolute_time();
+	// 	rc.timestamp_last_signal = rc.timestamp;
 
-		rc.channel_count = 8;
-		rc.rc_failsafe = false;
-		rc.rc_lost = false;
-		rc.rc_lost_frame_count = 0;
-		rc.rc_total_frame_count = 1;
-		rc.rc_ppm_frame_length = 0;
-		rc.input_source = input_rc_s::RC_INPUT_SOURCE_MAVLINK;
-		rc.rssi = RC_INPUT_RSSI_MAX;
+	// 	rc.channel_count = 8;
+	// 	rc.rc_failsafe = false;
+	// 	rc.rc_lost = false;
+	// 	rc.rc_lost_frame_count = 0;
+	// 	rc.rc_total_frame_count = 1;
+	// 	rc.rc_ppm_frame_length = 0;
+	// 	rc.input_source = input_rc_s::RC_INPUT_SOURCE_MAVLINK;
+	// 	rc.rssi = RC_INPUT_RSSI_MAX;
 
-		/* roll */
-		rc.values[0] = man.x / 2 + 1500;
-		/* pitch */
-		rc.values[1] = man.y / 2 + 1500;
-		/* yaw */
-		rc.values[2] = man.r / 2 + 1500;
-		/* throttle */
-		rc.values[3] = fminf(fmaxf(man.z / 0.9f + 800, 1000.0f), 2000.0f);
+	// 	/* roll */
+	// 	rc.values[0] = man.x / 2 + 1500;
+	// 	/* pitch */
+	// 	rc.values[1] = man.y / 2 + 1500;
+	// 	/* yaw */
+	// 	rc.values[2] = man.r / 2 + 1500;
+	// 	/* throttle */
+	// 	rc.values[3] = fminf(fmaxf(man.z / 0.9f + 800, 1000.0f), 2000.0f);
 
-		/* decode all switches which fit into the channel mask */
-		unsigned max_switch = (sizeof(man.buttons) * 8);
-		unsigned max_channels = (sizeof(rc.values) / sizeof(rc.values[0]));
+	// 	/* decode all switches which fit into the channel mask */
+	// 	unsigned max_switch = (sizeof(man.buttons) * 8);
+	// 	unsigned max_channels = (sizeof(rc.values) / sizeof(rc.values[0]));
 
-		if (max_switch > (max_channels - 4)) {
-			max_switch = (max_channels - 4);
-		}
+	// 	if (max_switch > (max_channels - 4)) {
+	// 		max_switch = (max_channels - 4);
+	// 	}
 
-		/* fill all channels */
-		for (unsigned i = 0; i < max_switch; i++) {
-			rc.values[i + 4] = decode_switch_pos_n(man.buttons, i);
-		}
+	// 	/* fill all channels */
+	// 	for (unsigned i = 0; i < max_switch; i++) {
+	// 		rc.values[i + 4] = decode_switch_pos_n(man.buttons, i);
+	// 	}
 
-		_mom_switch_state = man.buttons;
+	// 	_mom_switch_state = man.buttons;
 
-		if (_rc_pub == nullptr) {
-			_rc_pub = orb_advertise(ORB_ID(input_rc), &rc);
+	// 	if (_rc_pub == nullptr) {
+	// 		_rc_pub = orb_advertise(ORB_ID(input_rc), &rc);
 
-		} else {
-			orb_publish(ORB_ID(input_rc), _rc_pub, &rc);
-		}
+	// 	} else {
+	// 		orb_publish(ORB_ID(input_rc), _rc_pub, &rc);
+	// 	}
 
-	} else {
+	// } else {
 		struct manual_control_setpoint_s manual = {};
 
 		manual.timestamp = hrt_absolute_time();
-		manual.x = man.x / 1000.0f;
-		manual.y = man.y / 1000.0f;
-		manual.r = man.r / 1000.0f;
-		manual.z = man.z / 1000.0f;
+		manual.x = man.x;
+		manual.y = man.y;
+		manual.r = man.r;
+		manual.z = man.z;
 		manual.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
 
 		int m_inst;
-		orb_publish_auto(ORB_ID(manual_control_setpoint), &_manual_pub, &manual, &m_inst, ORB_PRIO_LOW);
-	}
+		orb_publish_auto(ORB_ID(manual_control_setpoint), &_manual_pub, &manual, &m_inst, ORB_PRIO_HIGH);
+	//}
 }
 
 void MavlinkReceiver::send_manual_overrides (uint16_t values[]){
@@ -2150,18 +2150,6 @@ void MavlinkReceiver::send_manual_overrides (uint16_t values[]){
 void
 MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 {
-	lastOverride++;
-	if(lastOverride > 3 && hasOverrides){
-		_mavlink->send_statustext_critical ("3_heartbeat_without_override" ) ;
-		uint16_t* overrides[18];
-		for ( int i = 0; i < 18; i++){
-			*overrides[i] = 0 ;
-		}
-		for ( int i = 0; i < 4; i++){
-			*overrides[i] = 1500;
-		}
-		send_manual_overrides (*overrides);
-	}
 	/* telemetry status supported only on first TELEMETRY_STATUS_ORB_ID_NUM mavlink channels */
 	if (_mavlink->get_channel() < (mavlink_channel_t)ORB_MULTI_MAX_INSTANCES) {
 		mavlink_heartbeat_t hb;
