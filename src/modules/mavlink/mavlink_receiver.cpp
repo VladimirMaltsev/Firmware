@@ -563,8 +563,8 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 
 		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
 		vcmd_mode.param1 = 29;
-		vcmd_mode.param2 = 4;
-		vcmd_mode.param3 = 3;
+		vcmd_mode.param2 = 2;
+		vcmd_mode.param3 = 0;
 
 		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
 		vcmd_mode.target_system = 1;
