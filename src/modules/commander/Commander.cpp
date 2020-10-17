@@ -1082,6 +1082,11 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_ROI_LOCATION:
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_ROI_WPNEXT_OFFSET:
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_ROI_NONE:
+	case 60300: //MAV_CMD_SWITCH_REMOTE_OVERRIDE_MODE
+	case 60606: //MAV_CMD_DO_ENGINE_ACTION
+	case 60666: //MAV_CMD_RELEASE_BUFFER_PARACHUTE
+	case 60667: //MAV_CMD_DROP_BUFFER_PARACHUTE
+	case 20001: //MAV_CMD_STG_ACTION
 		/* ignore commands that are handled by other parts of the system */
 		break;
 

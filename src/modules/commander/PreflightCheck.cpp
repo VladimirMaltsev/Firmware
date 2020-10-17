@@ -69,7 +69,7 @@ static bool check_calibration(const char *param_template, int32_t device_id)
 {
 	bool calibration_found = false;
 
-	char s[20];
+    char s[32];
 	int instance = 0;
 
 	/* old style transition: check param values */

@@ -701,7 +701,7 @@ FixedwingPositionControl::get_terrain_altitude_takeoff(float takeoff_alt,
 }
 
 bool
-FixedwingPositionControl::update_desired_altitude(float dt_p) {
+FixedwingPositionControl::update_desired_altitude(float dt) {
     /*
      * if the desired altitude less then 100m keep current altitude
      */
@@ -771,15 +771,15 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                            const position_setpoint_s &pos_sp_prev,
                                            const position_setpoint_s &pos_sp_curr,
                                            const position_setpoint_s &pos_sp_next) {
-    float dt_p = 0.01f;
+    float dt = 0.01f;
 
     if (_control_position_last_called > 0) {
-        dt_p = hrt_elapsed_time(&_control_position_last_called) * 1e-6f;
+        dt = hrt_elapsed_time(&_control_position_last_called) * 1e-6f;
     }
 
     _control_position_last_called = hrt_absolute_time();
 
-    _l1_control.set_dt(dt_p);
+    _l1_control.set_dt(dt);
 
     /* only run position controller in fixed-wing mode and during transitions for VTOL */
     if (_vehicle_status.is_rotary_wing && !_vehicle_status.in_transition_mode) {
@@ -868,7 +868,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             vcmd_mode.confirmation = 0;
             vcmd_mode.from_external = true;
 
-            orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
+            orb_advert_t _cmd_pub_mode{nullptr};
+            _cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
 
             //-SET-MODE-END-----------------------------
         }
@@ -1147,7 +1148,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         float altctrl_airspeed = _parameters.airspeed_trim;
 
         /* update desired altitude based on user pitch stick input */
-        bool climbout_requested = update_desired_altitude(dt_p);
+        bool climbout_requested = update_desired_altitude(dt);
 
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
@@ -1196,7 +1197,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         float altctrl_airspeed = _parameters.airspeed_trim;
 
         /* update desired altitude based on user pitch stick input */
-        bool climbout_requested = update_desired_altitude(dt_p);
+        bool climbout_requested = update_desired_altitude(dt);
 
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
@@ -1906,10 +1907,10 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
                                                      float throttle_min, float throttle_max, float throttle_cruise,
                                                      bool climbout_mode, float climbout_pitch_min_rad,
                                                      uint8_t mode) {
-    float dt_p = 0.01f; // prevent division with 0
+    float dt = 0.01f; // prevent division with 0
 
     if (_last_tecs_update > 0) {
-        dt_p = hrt_elapsed_time(&_last_tecs_update) * 1e-6;
+        dt = hrt_elapsed_time(&_last_tecs_update) * 1e-6;
     }
 
     _last_tecs_update = hrt_absolute_time();
@@ -1942,7 +1943,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 
         } else if (_was_in_transition) {
             // after transition we ramp up desired airspeed from the speed we had coming out of the transition
-            _asp_after_transition += dt_p * 2; // increase 2m/s
+            _asp_after_transition += dt * 2; // increase 2m/s
 
             if (_asp_after_transition < airspeed_sp && _airspeed < airspeed_sp) {
                 airspeed_sp = max(_asp_after_transition, _airspeed);

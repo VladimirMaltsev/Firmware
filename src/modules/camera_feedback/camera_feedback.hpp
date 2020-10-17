@@ -60,6 +60,7 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_gps_position.h>
 
 
 class CameraFeedback
@@ -93,6 +94,7 @@ private:
 	int			_main_task;				/**< handle for task */
 
 	int			_trigger_sub;
+	int 			_time_sub;
 	int			_gpos_sub;
 	int			_att_sub;
 
