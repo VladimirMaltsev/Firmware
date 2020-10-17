@@ -853,6 +853,21 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		if ((fabsf(air_gnd_angle) > M_PI_2_F) || (ground_speed.length() < 3.0f)) {
 			nav_speed_2d = air_speed_2d;
 		}
+
+//GIMBALL YAW LOGIC
+		float air_nav_angle = acosf((air_speed_2d * nav_speed_2d) / (air_speed_2d.length() * nav_speed_2d.length()));
+		float pwm_yaw;
+		if ((air_speed_2d(0) * nav_speed_2d(1) - air_speed_2d(1) * nav_speed_2d(0)) > 0)
+		pwm_yaw = air_nav_angle / (float)M_PI_4 * 2;
+		else
+		pwm_yaw = 0.0f - air_nav_angle / (float)M_PI_4 * 2;
+		act1.control[4] = pwm_yaw;
+
+		if (act_pub1 != nullptr) {
+		orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+		} else {
+		act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+		}
 	}
 
 	/* no throttle limit as default */
