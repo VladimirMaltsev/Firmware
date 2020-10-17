@@ -170,6 +170,15 @@ public:
         int loop_waypoint_curr{0};
         float acc_turning_radius{100};
         float radius{200};
+
+    //unexpected descent detector
+        bool unexpected_descent{false};
+        bool check_unexp_desc{false};
+        float dangerous_diff{0.f};
+        float dangerous_dist_to_takeoff_alt{0.f};
+        hrt_abstime dang_alt_time_det{0};
+        hrt_abstime unexp_desc_time{0};
+
 private:
     orb_advert_t	_mavlink_log_pub{nullptr};
 
@@ -236,7 +245,8 @@ private:
     position_setpoint_s _hdg_hold_curr_wp {};		///< position to which heading hold flies */
 
     hrt_abstime _control_position_last_called{0};		///< last call of control_position  */
-
+    hrt_abstime _manual_mode_last_updated{0};
+    bool _manual_mode_enabled{false};
     /* Landing */
     bool _land_noreturn_horizontal{false};
     bool _land_noreturn_vertical{false};
@@ -437,6 +447,7 @@ private:
 
     void		abort_landing(bool abort);
     void                engine_status_poll();
+    void                detect_unexpected_descent(position_setpoint_s psc);
 
     /**
      * Get a new waypoint based on heading and distance from current position

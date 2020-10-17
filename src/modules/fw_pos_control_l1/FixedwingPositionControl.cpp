@@ -429,6 +429,8 @@ FixedwingPositionControl::manual_control_setpoint_poll() {
     orb_check(_manual_control_sub, &manual_updated);
 
     if (manual_updated) {
+        mavlink_log_critical(&_mavlink_log_pub, "Updated manual control");
+        _manual_mode_last_updated = hrt_absolute_time();
         orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
     }
 }
@@ -1473,6 +1475,36 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 }
 
 void
+FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_curr){
+    if (!check_unexp_desc){
+        float diff = pos_sp_curr.alt - _global_pos.alt;
+        if (diff > 100.f){
+            check_unexp_desc = true;
+            dangerous_diff = diff;
+            dangerous_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
+            dang_alt_time_det = hrt_absolute_time();
+        }
+    } else {
+        if (hrt_elapsed_time(&dang_alt_time_det) > 3e6) {
+            float diff = pos_sp_curr.alt - _global_pos.alt;
+            float curr_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
+            if (((diff - dangerous_diff) > 25) && (
+                (dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)){
+                //detected an unexpected descent
+                unexpected_descent = true;
+                unexp_desc_time = hrt_absolute_time();
+                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / 3.f);
+            } else
+            {
+                check_unexp_desc = false;
+            }
+
+        }
+
+    }
+}
+
+void
 FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector2f &ground_speed,
                                           const position_setpoint_s &pos_sp_prev,
                                           const position_setpoint_s &pos_sp_curr) {
@@ -1666,8 +1698,8 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 
 		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
 		vcmd_mode.param1 = 29;
-		vcmd_mode.param2 = 4;
-		vcmd_mode.param3 = 3;
+		vcmd_mode.param2 = 2;
+		vcmd_mode.param3 = 0;
 
 		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
 		vcmd_mode.target_system = 1;
