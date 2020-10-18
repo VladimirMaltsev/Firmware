@@ -1379,65 +1379,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         is_landing = true;
         engine_enable(false);
         if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
-
-            act1.control[5] = -0.97f; //parachute drop
-            act1.control[6] = 0.2f; //buffer drop
-            act1.timestamp = hrt_absolute_time();
-            if (act_pub1 != nullptr) {
-                orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-            } else {
-                act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-            }
-            mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
-        }
-        //-SET-MODE-START-----------------------------
-		vehicle_command_s vcmd_mode = {};
-		vcmd_mode.timestamp = hrt_absolute_time();
-		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
-		vcmd_mode.param1 = 29;
-		vcmd_mode.param2 = 2;
-		vcmd_mode.param3 = 0;
-		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
-		vcmd_mode.target_system = 1;
-		vcmd_mode.target_component = 1;
-		vcmd_mode.source_system = 255;
-		vcmd_mode.source_component = 0;
-		vcmd_mode.confirmation = 0;
-		vcmd_mode.from_external = true;
-
-        orb_advert_t _cmd_pub_mode{nullptr};
-		if (_cmd_pub_mode == nullptr) {
-			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		} else {
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		}
-	//-SET-MODE-END-----------------------------
-
-        vehicle_command_s vcmd_disarm = {};
-        vcmd_disarm.timestamp = hrt_absolute_time();
-        vcmd_disarm.param1 = 0;
-        vcmd_disarm.param2 = 0;
-        vcmd_disarm.param3 = 0;
-        vcmd_disarm.param4 = 0;
-        vcmd_disarm.param5 = 0;
-        vcmd_disarm.param6 = 0;
-        vcmd_disarm.param7 = 0;
-        vcmd_disarm.command = 400;
-        vcmd_disarm.target_system = 1;
-        vcmd_disarm.target_component = 1;
-        vcmd_disarm.source_system = 255;
-        vcmd_disarm.source_component = 0;
-        vcmd_disarm.confirmation = 0;
-        vcmd_disarm.from_external = true;
-
-        orb_advert_t _cmd_pub1{nullptr};
-        if (_cmd_pub1 == nullptr) {
-            _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
-
-            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-        } else {
-            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
+            release_parachute();
+            set_mode();
+            set_arm(false);
         }
     }
 
@@ -1483,6 +1427,48 @@ void FixedwingPositionControl::engine_enable(bool enable){
 	px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, enable);
 }
 
+void FixedwingPositionControl::set_mode(float base_mode, float main_mode, float custom_mode){
+
+    vehicle_command_s vcmd_mode = {};
+    vcmd_mode.timestamp = hrt_absolute_time();
+
+    /* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
+    vcmd_mode.param1 = base_mode;
+    vcmd_mode.param2 = main_mode;
+    vcmd_mode.param3 = custom_mode;
+
+    vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
+    vcmd_mode.target_system = 1;
+    vcmd_mode.target_component = 1;
+    vcmd_mode.source_system = 255;
+    vcmd_mode.source_component = 0;
+    vcmd_mode.confirmation = 0;
+    vcmd_mode.from_external = true;
+
+    orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
+}
+
+void FixedwingPositionControl::set_arm(bool enable){
+    vehicle_command_s vcmd_disarm = {};
+    vcmd_disarm.timestamp = hrt_absolute_time();
+    vcmd_disarm.param1 = enable ? 1 : 0;
+    vcmd_disarm.param2 = 0;
+    vcmd_disarm.param3 = 0;
+    vcmd_disarm.param4 = 0;
+    vcmd_disarm.param5 = 0;
+    vcmd_disarm.param6 = 0;
+    vcmd_disarm.param7 = 0;
+    vcmd_disarm.command = 400;
+    vcmd_disarm.target_system = 1;
+    vcmd_disarm.target_component = 1;
+    vcmd_disarm.source_system = 255;
+    vcmd_disarm.source_component = 0;
+    vcmd_disarm.confirmation = 0;
+    vcmd_disarm.from_external = true;
+
+    orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
+}
+
 void
 FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_curr){
     if (!check_unexp_desc){
@@ -1512,6 +1498,42 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
         }
 
     }
+}
+
+void
+FixedwingPositionControl::play_tune(uint8_t id){
+    tune_control_s tc = {};
+    tc.tune_id = id;
+    tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
+    tc.tune_override = 0;
+    tc.timestamp = hrt_absolute_time();
+    orb_advertise(ORB_ID(tune_control), &tc);
+}
+
+void
+FixedwingPositionControl::release_parachute(){
+    act1.control[5] = -0.97f; //parachute drop
+    act1.control[6] = 0.2f; //buffer drop
+    act1.timestamp = hrt_absolute_time();
+    if (act_pub1 != nullptr) {
+        orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+    } else {
+        act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+    }
+    mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+}
+
+void
+FixedwingPositionControl::drop_parachute(){
+    act1.control[7] = 1.0f;
+    act1.control[6] = 0.0f;
+    act1.timestamp = hrt_absolute_time();
+    if (act_pub1 != nullptr) {
+        orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+    } else {
+        act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+    }
+    mavlink_log_critical(&_mavlink_log_pub, "Parachute is dropped");
 }
 
 void
@@ -1666,16 +1688,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
     } else {
 
         if (!parachute_released){
-
-            act1.control[5] = -0.97f; //parachute drop
-            act1.control[6] = 0.2f; //buffer drop
-            act1.timestamp = hrt_absolute_time();
-            if (act_pub1 != nullptr) {
-                orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-            } else {
-                act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-            }
-            mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+            release_parachute();
         }
         parachute_released = true;
 
@@ -1687,82 +1700,12 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
     }
 
     if (!parachute_dropped && _vehicle_land_detected.landed) {
-        act1.control[7] = 1.0f;
-		act1.control[6] = 0.0f;
-		act1.timestamp = hrt_absolute_time();
-		if (act_pub1 != nullptr) {
-			orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-		} else {
-			act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-		}
-
-        mavlink_log_critical(&_mavlink_log_pub, "Parachute is dropped");
+        drop_parachute();
         parachute_dropped = true;
 
-    //-SET-MODE-START-----------------------------
-        orb_advert_t _cmd_pub_mode{nullptr};
-		vehicle_command_s vcmd_mode = {};
-		vcmd_mode.timestamp = hrt_absolute_time();
-
-		/* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
-		vcmd_mode.param1 = 29;
-		vcmd_mode.param2 = 2;
-		vcmd_mode.param3 = 0;
-
-		vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
-		vcmd_mode.target_system = 1;
-		vcmd_mode.target_component = 1;
-		vcmd_mode.source_system = 255;
-		vcmd_mode.source_component = 0;
-		vcmd_mode.confirmation = 0;
-		vcmd_mode.from_external = true;
-
-		if (_cmd_pub_mode == nullptr) {
-			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		} else {
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		}
-	//-SET-MODE-END-----------------------------
-
-        vehicle_command_s vcmd_disarm = {};
-        vcmd_disarm.timestamp = hrt_absolute_time();
-        vcmd_disarm.param1 = 0;
-        vcmd_disarm.param2 = 0;
-        vcmd_disarm.param3 = 0;
-        vcmd_disarm.param4 = 0;
-        vcmd_disarm.param5 = 0;
-        vcmd_disarm.param6 = 0;
-        vcmd_disarm.param7 = 0;
-        vcmd_disarm.command = 400;
-        vcmd_disarm.target_system = 1;
-        vcmd_disarm.target_component = 1;
-        vcmd_disarm.source_system = 255;
-        vcmd_disarm.source_component = 0;
-        vcmd_disarm.confirmation = 0;
-        vcmd_disarm.from_external = true;
-
-        orb_advert_t _cmd_pub1{nullptr};
-        if (_cmd_pub1 == nullptr) {
-            _cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
-            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-        } else {
-            orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-        }
-
-		tune_control_s tc = {};
-		orb_advert_t tune_control_pub = nullptr;
-		tc.tune_id = 8;
-		tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
-		tc.tune_override = 0;
-		tc.timestamp = hrt_absolute_time();
-		if (tune_control_pub != nullptr) {
-            orb_publish(ORB_ID(tune_control), tune_control_pub, &tc);
-		} else {
-			tune_control_pub = orb_advertise(ORB_ID(tune_control), &tc);
-		}
-
-
+        set_mode();
+        set_arm(false);
+        play_tune((uint8_t)8);
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,

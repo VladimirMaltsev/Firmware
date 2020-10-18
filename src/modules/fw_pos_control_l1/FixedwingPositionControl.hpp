@@ -451,6 +451,13 @@ private:
 
     void                engine_enable(bool enable);
 
+    void                set_mode(float base_mode = 29, float main_mode = 2, float custom_mode = 0);
+    void                set_arm(bool enable);
+    void                play_tune(uint8_t id);
+
+    void                release_parachute();
+    void                drop_parachute();
+
     /**
      * Get a new waypoint based on heading and distance from current position
      *
