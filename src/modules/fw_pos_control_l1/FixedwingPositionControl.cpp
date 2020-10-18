@@ -1382,6 +1382,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             release_parachute();
             set_mode();
             set_arm(false);
+            play_tune(11);
         }
     }
 
@@ -1503,7 +1504,7 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
 void
 FixedwingPositionControl::play_tune(uint8_t id){
     tune_control_s tc = {};
-    tc.tune_id = 11;
+    tc.tune_id = id;
     tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
     tc.tune_override = 0;
     tc.timestamp = hrt_absolute_time();
@@ -1705,7 +1706,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 
         set_mode();
         set_arm(false);
-        play_tune((uint8_t)8);
+        play_tune(11);
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,
