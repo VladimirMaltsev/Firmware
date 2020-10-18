@@ -1671,20 +1671,6 @@ Commander::run()
 		estimator_check(&status_changed);
 		airspeed_use_check();
 
-		/*Update stg_status check*/
-		// bool updated_stg = false;
-		// orb_check(stg_status_sub, &updated_stg);
-		// if (updated_stg){
-		// 	struct stg_status_s s_s = {};
-		// 	orb_copy(ORB_ID(stg_status), stg_status_sub, &s_s);
-
-		// 	if (armed.armed){
-		// 		if(s_s.rpm_cranckshaft < 22) {
-					
-		// 		}
-		// 	}
-		// }
-
 		/* Update land detector */
 		orb_check(land_detector_sub, &updated);
 		if (updated) {
@@ -1695,16 +1681,12 @@ Commander::run()
 				if (was_landed != land_detector.landed) {
 					if (land_detector.landed) {
 						mavlink_and_console_log_info(&mavlink_log_pub, "Landing detected");
-						tune_control_s tune_control = {};
-						orb_advert_t tune_control_pub = nullptr;     
-						tune_control_pub = orb_advertise(ORB_ID(tune_control), &tune_control);
-
-						tune_control.tune_id = 8;
-						tune_control.volume = tune_control_s::VOLUME_LEVEL_MAX;
-						tune_control.tune_override = 1;
-						tune_control.timestamp = hrt_absolute_time();
-						orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
-
+						tune_control_s tc = {};
+						tc.tune_id = 11;
+						tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
+						tc.tune_override = 0;
+						tc.timestamp = hrt_absolute_time();
+						orb_advertise(ORB_ID(tune_control), &tc);
 					} else {
 						mavlink_and_console_log_info(&mavlink_log_pub, "Takeoff detected");
 						have_taken_off_since_arming = true;
