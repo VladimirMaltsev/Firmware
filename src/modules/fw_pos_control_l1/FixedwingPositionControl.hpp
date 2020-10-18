@@ -449,6 +449,8 @@ private:
     void                engine_status_poll();
     void                detect_unexpected_descent(position_setpoint_s psc);
 
+    void                engine_enable(bool enable);
+
     /**
      * Get a new waypoint based on heading and distance from current position
      *

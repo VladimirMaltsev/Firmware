@@ -352,11 +352,7 @@ FixedwingPositionControl::engine_status_poll() {
             _engine_restart_thr_delay = hrt_absolute_time();
             enable_engine_restart = true;
 
-            px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
-			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
-			mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
-
-            mavlink_log_critical(&_mavlink_log_pub, "Engine starter on");
+            engine_enable(true);
 
             vehicle_command_s vcmd_stg = {};
             vcmd_stg.param1 = 1;
@@ -1370,7 +1366,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     if (enable_engine_restart){
         _att_sp.thrust_body[0] = _parameters.throttle_idle;
 
-        if (hrt_elapsed_time(&_engine_restart_thr_delay) > 3e6) {
+        if (hrt_elapsed_time(&_engine_restart_thr_delay) > 4e6) {
             enable_engine_restart = false;
             mavlink_log_critical(&_mavlink_log_pub, "Engine restarted");
         }
@@ -1380,6 +1376,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
     if (unexpected_descent){
         _att_sp.thrust_body[0] = 0.f;
+        is_landing = true;
+        engine_enable(false);
         if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
 
             act1.control[5] = -0.97f; //parachute drop
@@ -1474,6 +1472,17 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     return setpoint;
 }
 
+void FixedwingPositionControl::engine_enable(bool enable){
+
+    if (enable){
+        mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
+    }else
+        mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+
+    px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+	px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, enable);
+}
+
 void
 FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_curr){
     if (!check_unexp_desc){
@@ -1488,8 +1497,9 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
         if (hrt_elapsed_time(&dang_alt_time_det) > 3e6) {
             float diff = pos_sp_curr.alt - _global_pos.alt;
             float curr_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
-            if (((diff - dangerous_diff) > 25) && (
-                (dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)){
+            //if vertical speed > 8 m/s or > 3 m/s and engine off
+            if ((((diff - dangerous_diff) > 25) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)) ||
+                (((diff - dangerous_diff) > 9) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 9) && enable_engine_restart)){
                 //detected an unexpected descent
                 unexpected_descent = true;
                 unexp_desc_time = hrt_absolute_time();
@@ -1652,9 +1662,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_max = 0.f;
         throttle_min = 0.f;
 
-        px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
-        px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
-        mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+        engine_enable(false);
     } else {
 
         if (!parachute_released){
