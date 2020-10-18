@@ -96,7 +96,7 @@ PX4_DEFINE_TUNE(7,  BATTERY_WARNING_SLOW,  "MBNT100a8",                         
 PX4_DEFINE_TUNE(8,  BATTERY_WARNING_FAST,  "MBNT255a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8",       true  /*  battery warning fast */)
 PX4_DEFINE_TUNE(9,  GPS_WARNING,           "MFT255L4AAAL1F#",                               false /*  gps warning slow */)
 PX4_DEFINE_TUNE(10, ARMING_FAILURE,        "MFT255L4<<<BAP",                                false /*  arming failure tune */)
-PX4_DEFINE_TUNE(11, PARACHUTE_RELEASE,     "MFT255L16agagagag",                             false /*  parachute release */)
+PX4_DEFINE_TUNE(11, PARACHUTE_RELEASE,     "MBNT120O4L8E9N0EDDN0EN0EN0EDDDN0E9N0EDDN0E",    false /*  parachute release */)
 PX4_DEFINE_TUNE(12, EKF_WARNING,           "MFT255L8ddd#d#eeff",                            false /*  ekf warning */)
 PX4_DEFINE_TUNE(13, BARO_WARNING,          "MFT255L4gf#fed#d",                              false /*  baro warning */)
 PX4_DEFINE_TUNE(14, SINGLE_BEEP,           "MFT100a8",                                      false /*  single beep */)
