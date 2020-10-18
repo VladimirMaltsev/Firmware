@@ -85,7 +85,7 @@
 
 //           ordinal name                  tune                                        interruptable*     hint
 //  * Repeated tunes should always be defined as interruptable, if not an explict 'tone_control stop' is needed
-PX4_DEFINE_TUNE(0,  CUSTOM,                "MFT120e8e8f8g8e8e8f8g8c8c8c8e8f8g8",                                              true  /*  empty to align with the index */)
+PX4_DEFINE_TUNE(21,  CUSTOM,               "MFT120e8e8f8g8e8e8f8g8c8c8c8e8f8g8",            false  /*  empty to align with the index */)
 PX4_DEFINE_TUNE(1,  STARTUP,               "MFT240L8 O4aO5dc O4aO5dc O4aO5dc L16dcdcdcdc",  true  /*  startup tune */)
 PX4_DEFINE_TUNE(2,  ERROR_TUNE,            "MBT200a8a8a8PaaaP",                             true  /*  ERROR tone */)
 PX4_DEFINE_TUNE(3,  NOTIFY_POSITIVE,       "MFT200e8a8a",                                   true  /*  Notify Positive tone */)
@@ -96,7 +96,7 @@ PX4_DEFINE_TUNE(7,  BATTERY_WARNING_SLOW,  "MBNT100a8",                         
 PX4_DEFINE_TUNE(8,  BATTERY_WARNING_FAST,  "MBNT255a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8",       true  /*  battery warning fast */)
 PX4_DEFINE_TUNE(9,  GPS_WARNING,           "MFT255L4AAAL1F#",                               false /*  gps warning slow */)
 PX4_DEFINE_TUNE(10, ARMING_FAILURE,        "MFT255L4<<<BAP",                                false /*  arming failure tune */)
-PX4_DEFINE_TUNE(11, PARACHUTE_RELEASE,     "MFT255L16agagagag",                             false /*  parachute release */)
+PX4_DEFINE_TUNE(11, PARACHUTE_RELEASE,     "MBNT120O4L8E9N0EDDN0EN0EN0EDDDN0E9N0EDDN0E",    false /*  parachute release */)
 PX4_DEFINE_TUNE(12, EKF_WARNING,           "MFT255L8ddd#d#eeff",                            false /*  ekf warning */)
 PX4_DEFINE_TUNE(13, BARO_WARNING,          "MFT255L4gf#fed#d",                              false /*  baro warning */)
 PX4_DEFINE_TUNE(14, SINGLE_BEEP,           "MFT100a8",                                      false /*  single beep */)

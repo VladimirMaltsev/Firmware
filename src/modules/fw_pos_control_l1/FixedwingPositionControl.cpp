@@ -1503,7 +1503,7 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
 void
 FixedwingPositionControl::play_tune(uint8_t id){
     tune_control_s tc = {};
-    tc.tune_id = id;
+    tc.tune_id = 11;
     tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
     tc.tune_override = 0;
     tc.timestamp = hrt_absolute_time();
