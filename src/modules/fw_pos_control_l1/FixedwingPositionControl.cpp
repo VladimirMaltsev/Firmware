@@ -353,29 +353,16 @@ FixedwingPositionControl::engine_status_poll() {
             enable_engine_restart = true;
 
             engine_enable(true);
+            starter_enable(true);
 
-            vehicle_command_s vcmd_stg = {};
-            vcmd_stg.param1 = 1;
-            vcmd_stg.param2 = 0;
-            vcmd_stg.param3 = 0;
-            vcmd_stg.param4 = 0;
-            vcmd_stg.param5 = 0;
-            vcmd_stg.param6 = 0;
-            vcmd_stg.param7 = 0;
-            vcmd_stg.command = 20001;
-            vcmd_stg.target_system = 1;
-            vcmd_stg.target_component = 0;
-            vcmd_stg.source_system = 255;
-            vcmd_stg.source_component = 0;
-            vcmd_stg.from_external = false;
-            vcmd_stg.confirmation = 0;
-
-            orb_advert_t _cmd_pub{nullptr};
-
-            if (_cmd_pub == nullptr)
-                _cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
-            else
-                orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
+        } else if (_ess.eng_st == 4){
+            if (!_control_mode.flag_armed && _vehicle_land_detected.landed) {
+                release_parachute();
+            }
+        } else if (_ess.eng_st == 5){
+            if (!_control_mode.flag_armed && _vehicle_land_detected.landed) {
+                close_parachute();
+            }
         }
     }
 }
@@ -1380,6 +1367,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         engine_enable(false);
         if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
             release_parachute();
+            release_buffer();
             set_mode();
             set_arm(false);
             play_tune(11);
@@ -1467,7 +1455,27 @@ void FixedwingPositionControl::set_arm(bool enable){
     vcmd_disarm.confirmation = 0;
     vcmd_disarm.from_external = true;
 
-    orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
+    orb_advertise(ORB_ID(vehicle_command), &vcmd_disarm);
+}
+
+void FixedwingPositionControl::starter_enable(bool enable){
+    vehicle_command_s vcmd_stg = {};
+    vcmd_stg.param1 = enable ? 1 : 0;
+    vcmd_stg.param2 = 0;
+    vcmd_stg.param3 = 0;
+    vcmd_stg.param4 = 0;
+    vcmd_stg.param5 = 0;
+    vcmd_stg.param6 = 0;
+    vcmd_stg.param7 = 0;
+    vcmd_stg.command = 20001;
+    vcmd_stg.target_system = 1;
+    vcmd_stg.target_component = 0;
+    vcmd_stg.source_system = 255;
+    vcmd_stg.source_component = 0;
+    vcmd_stg.from_external = false;
+    vcmd_stg.confirmation = 0;
+
+    orb_advertise(ORB_ID(vehicle_command), &vcmd_stg);
 }
 
 void
@@ -1512,9 +1520,32 @@ FixedwingPositionControl::play_tune(uint8_t id){
 }
 
 void
-FixedwingPositionControl::release_parachute(){
-    act1.control[5] = -0.97f; //parachute drop
+FixedwingPositionControl::release_buffer(){
     act1.control[6] = 0.2f; //buffer drop
+    act1.timestamp = hrt_absolute_time();
+    if (act_pub1 != nullptr) {
+        orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+    } else {
+        act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+    }
+    mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+}
+
+void
+FixedwingPositionControl::release_parachute(){
+    act1.control[5] = -0.97f; //parachute release
+    act1.timestamp = hrt_absolute_time();
+    if (act_pub1 != nullptr) {
+        orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+    } else {
+        act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+    }
+    mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+}
+
+void
+FixedwingPositionControl::close_parachute(){
+    act1.control[5] = 0.f; //parachute release
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -1690,6 +1721,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 
         if (!parachute_released){
             release_parachute();
+            release_buffer();
         }
         parachute_released = true;
 

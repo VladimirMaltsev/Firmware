@@ -450,12 +450,15 @@ private:
     void                detect_unexpected_descent(position_setpoint_s psc);
 
     void                engine_enable(bool enable);
+    void                starter_enable(bool enable);
 
     void                set_mode(float base_mode = 29, float main_mode = 2, float custom_mode = 0);
     void                set_arm(bool enable);
     void                play_tune(uint8_t id);
 
     void                release_parachute();
+    void                close_parachute();
+    void                release_buffer();
     void                drop_parachute();
 
     /**

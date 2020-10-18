@@ -94,7 +94,7 @@ GpsFailure::on_active()
 			if (baro_altitude_amsl - _gps_failed_altitude < 500.f) {
 				att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
 			} else if (baro_altitude_amsl - _gps_failed_altitude > 550.f){
-				att_sp.pitch_body = -5.f;
+				att_sp.pitch_body = math::radians(-5.f);
 			} else
 				att_sp.pitch_body = 0.f;
 
