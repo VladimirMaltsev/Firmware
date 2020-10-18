@@ -580,6 +580,13 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		int enable_airspeed = 0;
                 param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 
+		tune_control_s tc = {};
+		tc.tune_id = 11;
+		tc.volume = tune_control_s::VOLUME_LEVEL_MAX;
+		tc.tune_override = 0;
+		tc.timestamp = hrt_absolute_time();
+		orb_advertise(ORB_ID(tune_control), &tc);
+
 	} else if (cmd_mavlink.command == MAV_CMD_DROP_BUFFER_PARACHUTE) {
 
 		int sys_autostart = 0;

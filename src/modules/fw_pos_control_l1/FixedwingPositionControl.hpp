@@ -445,6 +445,12 @@ private:
     void		abort_landing(bool abort);
     void                detect_unexpected_descent(position_setpoint_s psc);
 
+    void                set_mode(float base_mode = 29, float main_mode = 2, float custom_mode = 0);
+    void                set_arm(bool enable);
+    void                play_tune(uint8_t id);
+
+    void                release_parachute();
+    void                drop_parachute();
     /**
      * Get a new waypoint based on heading and distance from current position
      *
