@@ -853,25 +853,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             _launch_detection_notify = hrt_absolute_time();
             _manual_mode_enabled = false;
 
-            //-SET-MODE-MISSION-----------------------------
-            vehicle_command_s vcmd_mode = {};
-            vcmd_mode.timestamp = hrt_absolute_time();
-            /* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
-            vcmd_mode.param1 = 157;
-            vcmd_mode.param2 = 4;
-            vcmd_mode.param3 = 4;
-            vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
-            vcmd_mode.target_system = 1;
-            vcmd_mode.target_component = 1;
-            vcmd_mode.source_system = 255;
-            vcmd_mode.source_component = 0;
-            vcmd_mode.confirmation = 0;
-            vcmd_mode.from_external = true;
-
-            orb_advert_t _cmd_pub_mode{nullptr};
-            _cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-
-            //-SET-MODE-END-----------------------------
+            set_mode(157, 4, 4);
         }
     }
 
@@ -1471,6 +1453,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
 
+            get_waypoint_heading_distance(_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+
             /* Inform user that launchdetection is running every 4s */
             if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
                 mavlink_log_critical(&_mavlink_log_pub, "Launch detection running 010");
@@ -1493,10 +1477,6 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
     if (_launch_detection_state != LAUNCHDETECTION_RES_NONE) {
         /* Launch has been detected, hence we have to control the plane. */
 
-        _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
-        _att_sp.roll_body = _l1_control.get_roll_setpoint();
-        _att_sp.yaw_body = _l1_control.nav_bearing();
-
         /* Select throttle: only in LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS we want to use
             * full throttle, otherwise we use idle throttle */
         float takeoff_throttle = _parameters.throttle_max;
@@ -1513,6 +1493,16 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
         if (_parameters.climbout_diff > 0.0f && altitude_error > _parameters.climbout_diff) {
             /* enforce a minimum of 10 degrees pitch up on takeoff, or take parameter */
+
+            Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
+            Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
+
+            /* populate l1 control setpoint */
+            _l1_control.navigate_waypoints(prev_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+
+            _att_sp.roll_body = _l1_control.get_roll_setpoint();
+            _att_sp.yaw_body = _l1_control.nav_bearing();
+            _takeoff_throttle = 1.0f;
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
                                         radians(10.0f),
@@ -1524,10 +1514,17 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         max(radians(pos_sp_curr.pitch_min), radians(20.0f)),
                                         tecs_status_s::TECS_MODE_TAKEOFF);
 
-            /* limit roll motion to ensure enough lift */
+
+
+            // /* limit roll motion to ensure enough lift */
             _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
 
         } else {
+
+            _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
+            _att_sp.roll_body = _l1_control.get_roll_setpoint();
+            _att_sp.yaw_body = _l1_control.nav_bearing();
+
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         calculate_target_airspeed(_parameters.airspeed_trim),
                                         radians(_parameters.pitch_limit_min),
