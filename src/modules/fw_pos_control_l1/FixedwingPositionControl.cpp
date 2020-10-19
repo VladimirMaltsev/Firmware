@@ -1590,6 +1590,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
 
+
+            get_waypoint_heading_distance(_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+
             /* Inform user that launchdetection is running every 4s */
             if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
                 mavlink_log_critical(&_mavlink_log_pub, "Launch detection running 010");
@@ -1612,10 +1615,6 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
     if (_launch_detection_state != LAUNCHDETECTION_RES_NONE) {
         /* Launch has been detected, hence we have to control the plane. */
 
-        _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
-        _att_sp.roll_body = _l1_control.get_roll_setpoint();
-        _att_sp.yaw_body = _l1_control.nav_bearing();
-
         /* Select throttle: only in LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS we want to use
             * full throttle, otherwise we use idle throttle */
         float takeoff_throttle = _parameters.throttle_max;
@@ -1631,7 +1630,17 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
         if (_parameters.climbout_diff > 0.0f && altitude_error > _parameters.climbout_diff) {
-            /* enforce a minimum of 6 degrees pitch up on takeoff, or take parameter */
+
+            Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
+            Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
+
+            /* populate l1 control setpoint */
+            _l1_control.navigate_waypoints(prev_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+
+            _att_sp.roll_body = _l1_control.get_roll_setpoint();
+            _att_sp.yaw_body = _l1_control.nav_bearing();
+
+            /* enforce a minimum of 8 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
                                         radians(8.0f),
@@ -1647,6 +1656,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
 
         } else {
+
+            _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
+            _att_sp.roll_body = _l1_control.get_roll_setpoint();
+            _att_sp.yaw_body = _l1_control.nav_bearing();
+
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         calculate_target_airspeed(_parameters.airspeed_trim),
                                         radians(_parameters.pitch_limit_min),
