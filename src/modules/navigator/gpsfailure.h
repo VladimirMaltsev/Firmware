@@ -45,6 +45,8 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/vehicle_air_data.h>
+#include <uORB/topics/vehicle_control_mode.h>
+#include <uORB/topics/manual_control_setpoint.h>
 
 class Navigator;
 
@@ -79,6 +81,11 @@ private:
 	uORB::Subscription<vehicle_air_data_s>	_sub_airdata;
 	float _gps_failed_altitude{0};
 
+	int	_manual_control_sub{-1};		///< notification of manual control updates */
+   	int	_control_mode_sub{-1};			///< control mode subscription */
+
+	manual_control_setpoint_s	_manual {};			///< r/c channel data */
+	vehicle_control_mode_s		_control_mode {};		///< control mode */
 	/**
 	 * Set the GPSF item
 	 */
@@ -88,5 +95,9 @@ private:
 	 * Move to next GPSF item
 	 */
 	void		advance_gpsf();
+
+	void vehicle_control_mode_poll();
+
+	void manual_control_setpoint_poll();
 
 };

@@ -47,6 +47,8 @@
 #include <uORB/topics/mission.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
+
+
 #include <uORB/topics/actuator_controls.h>
 #include <mathlib/mathlib.h>
 
@@ -72,6 +74,9 @@ GpsFailure::on_inactive()
 void
 GpsFailure::on_activation()
 {
+	_control_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
+	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
+
 	_gpsf_state = GPSF_STATE_NONE;
 	_timestamp_activation = hrt_absolute_time();
 	advance_gpsf();
@@ -79,51 +84,78 @@ GpsFailure::on_activation()
 }
 
 void
+GpsFailure::manual_control_setpoint_poll() {
+    bool manual_updated = false;
+    orb_check(_manual_control_sub, &manual_updated);
+
+    if (manual_updated) {
+        orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
+    }
+}
+
+void
+GpsFailure::vehicle_control_mode_poll() {
+    bool updated = false;
+    orb_check(_control_mode_sub, &updated);
+
+    if (updated) {
+	orb_copy(ORB_ID(vehicle_control_mode), _control_mode_sub, &_control_mode);
+    }
+}
+
+void
 GpsFailure::on_active()
 {
 	switch (_gpsf_state) {
 	case GPSF_STATE_LOITER: {
-			/* Position controller does not run in this mode:
-			 * navigator has to publish an attitude setpoint */
-			vehicle_attitude_setpoint_s att_sp = {};
-			att_sp.timestamp = hrt_absolute_time();
+		vehicle_control_mode_poll();
+		manual_control_setpoint_poll();
 
-			// get baro altitude
-			_sub_airdata.update();
-			const float baro_altitude_amsl = _sub_airdata.get().baro_alt_meter;
-			if (baro_altitude_amsl - _gps_failed_altitude < 500.f) {
-				att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
-			} else if (baro_altitude_amsl - _gps_failed_altitude > 550.f){
-				att_sp.pitch_body = math::radians(-5.f);
-			} else
-				att_sp.pitch_body = 0.f;
+		bool alt_mode = _control_mode.flag_control_altitude_enabled;
+		/* Position controller does not run in this mode:
+		* navigator has to publish an attitude setpoint */
+		vehicle_attitude_setpoint_s att_sp = {};
+		att_sp.timestamp = hrt_absolute_time();
 
+		// get baro altitude
+		_sub_airdata.update();
+		const float baro_altitude_amsl = _sub_airdata.get().baro_alt_meter;
+		if (baro_altitude_amsl - _gps_failed_altitude < 500.f) {
+			att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
+		} else if (baro_altitude_amsl - _gps_failed_altitude > 550.f){
+			att_sp.pitch_body = math::radians(-5.f);
+		} else
+			att_sp.pitch_body = 0.f;
+
+		if (alt_mode)
+			att_sp.roll_body = math::radians(_manual.y);
+		else
 			att_sp.roll_body = math::radians(_param_nav_gpsf_r.get());
-			att_sp.thrust_body[0] = _param_nav_gpsf_tr.get();
+		att_sp.thrust_body[0] = _param_nav_gpsf_tr.get();
 
-			Quatf q(Eulerf(att_sp.roll_body, att_sp.pitch_body, 0.0f));
-			q.copyTo(att_sp.q_d);
-			att_sp.q_d_valid = true;
+		Quatf q(Eulerf(att_sp.roll_body, att_sp.pitch_body, 0.0f));
+		q.copyTo(att_sp.q_d);
+		att_sp.q_d_valid = true;
 
-			if (_att_sp_pub != nullptr) {
-				/* publish att sp*/
-				orb_publish(ORB_ID(vehicle_attitude_setpoint), _att_sp_pub, &att_sp);
+		if (_att_sp_pub != nullptr) {
+			/* publish att sp*/
+			orb_publish(ORB_ID(vehicle_attitude_setpoint), _att_sp_pub, &att_sp);
 
-			} else {
-				/* advertise and publish */
-				_att_sp_pub = orb_advertise(ORB_ID(vehicle_attitude_setpoint), &att_sp);
-			}
-
-			/* Measure time */
-			if ((_param_nav_gpsf_lt.get() > FLT_EPSILON) &&
-			    (hrt_elapsed_time(&_timestamp_activation) > _param_nav_gpsf_lt.get() * 1e6f)) {
-				/* no recovery, advance the state machine */
-				PX4_WARN("GPS not recovered, switching to next failure state");
-				advance_gpsf();
-			}
-
-			break;
+		} else {
+			/* advertise and publish */
+			_att_sp_pub = orb_advertise(ORB_ID(vehicle_attitude_setpoint), &att_sp);
 		}
+
+		/* Measure time */
+		if ((_param_nav_gpsf_lt.get() > FLT_EPSILON) &&
+			(hrt_elapsed_time(&_timestamp_activation) > _param_nav_gpsf_lt.get() * 1e6f)) {
+			/* no recovery, advance the state machine */
+			PX4_WARN("GPS not recovered, switching to next failure state");
+			advance_gpsf();
+		}
+
+		break;
+	}
 
 	case GPSF_STATE_TERMINATE:
 	{
