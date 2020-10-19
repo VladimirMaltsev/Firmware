@@ -923,26 +923,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
             _launch_detection_notify = hrt_absolute_time();
             _manual_mode_enabled = false;
-
-            //-SET-MODE-MISSION-----------------------------
-            vehicle_command_s vcmd_mode = {};
-            vcmd_mode.timestamp = hrt_absolute_time();
-            /* copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
-            vcmd_mode.param1 = 157;
-            vcmd_mode.param2 = 4;
-            vcmd_mode.param3 = 4;
-            vcmd_mode.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
-            vcmd_mode.target_system = 1;
-            vcmd_mode.target_component = 1;
-            vcmd_mode.source_system = 255;
-            vcmd_mode.source_component = 0;
-            vcmd_mode.confirmation = 0;
-            vcmd_mode.from_external = true;
-
-            orb_advert_t _cmd_pub_mode{nullptr};
-            _cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-
-            //-SET-MODE-END-----------------------------
+            set_mode(157, 4, 4);
         }
     }
 
