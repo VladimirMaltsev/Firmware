@@ -1493,7 +1493,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
-        if (_parameters.climbout_diff > 0.0f && altitude_diff > _parameters.climbout_diff) {
+        if (_parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
             /* enforce a minimum of 10 degrees pitch up on takeoff, or take parameter */
 
             Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
