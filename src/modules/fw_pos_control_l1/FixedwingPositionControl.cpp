@@ -1590,8 +1590,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
 
-
+            // create virtual waypoint in 500m ahead before takeoff
             get_waypoint_heading_distance(_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+            _takeoff_ground_alt = _global_pos.alt;
 
             /* Inform user that launchdetection is running every 4s */
             if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
@@ -1626,10 +1627,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         /* select maximum pitch: the launchdetector may impose another limit for the pitch
             * depending on the state of the launch */
         const float takeoff_pitch_max_deg = _launchDetector.getPitchMax(_parameters.pitch_limit_max);
-        const float altitude_error = pos_sp_curr.alt - _global_pos.alt;
+        const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
-        if (_parameters.climbout_diff > 0.0f && altitude_error > _parameters.climbout_diff) {
+        if (_parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
 
             Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
             Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
@@ -1639,6 +1640,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
             _att_sp.yaw_body = _l1_control.nav_bearing();
+
+            takeoff_throttle = 1.0f;
 
             /* enforce a minimum of 8 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
