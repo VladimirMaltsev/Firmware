@@ -1085,7 +1085,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
             _att_sp.yaw_body = _l1_control.nav_bearing();
 
-            tecs_update_pitch_throttle(pos_sp_curr.alt,
+            float alt = abs(pos_sp_curr.alt - pos_sp_prev.alt) > 50 ? pos_sp_prev.alt : pos_sp_curr.alt;
+
+            tecs_update_pitch_throttle(alt,
                                        calculate_target_airspeed(mission_airspeed),
                                        radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
                                        radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,

@@ -132,5 +132,7 @@ protected:
 	hrt_abstime _action_start{0};
 	hrt_abstime _time_wp_reached{0};
 
+	bool _needing_loiter{false};
+
 	orb_advert_t    _actuator_pub{nullptr};
 };
