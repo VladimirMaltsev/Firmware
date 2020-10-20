@@ -155,7 +155,7 @@ MissionBlock::is_mission_item_reached()
 			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
 
 			/* close to waypoint, 15m, but alt error is big */
-			if ((dist >= 0.0f) && (dist_z > 50.f) && (dist_xy < 15.f)) {
+			if ((dist >= 0.0f) && (dist_z > _navigator->get_altitude_acceptance_radius()) && (dist_xy < 15.f)) {
 				_needing_loiter = true;
 			}
 
