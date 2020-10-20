@@ -154,30 +154,30 @@ MissionBlock::is_mission_item_reached()
 
 			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
 
-			/* close to waypoint, but altitude error greater than twice acceptance */
-			if ((dist >= 0.0f)
-			    && (dist_z > 2 * _navigator->get_altitude_acceptance_radius())
-			    && (dist_xy < 2 * _navigator->get_loiter_radius())) {
+			/* close to waypoint, 15m, but alt error is big */
+			if ((dist >= 0.0f) && (dist_z > 50.f) && (dist_xy < 15.f)) {
+				_needing_loiter = true;
+			}
 
+			if ((dist_xy > 15.f) && _needing_loiter) {
+				_needing_loiter = false;
 				/* SETPOINT_TYPE_POSITION -> SETPOINT_TYPE_LOITER */
 				if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+
 					curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 					curr_sp->loiter_radius = _navigator->get_loiter_radius();
 					curr_sp->loiter_direction = 1;
+
+					const position_setpoint_s &next_sp = _navigator->get_position_setpoint_triplet()->next;
+					_mission_item.yaw  = get_bearing_to_next_waypoint(next_sp.lat, next_sp.lon, curr_sp->lat, curr_sp->lon);
+
+					waypoint_from_heading_and_distance(curr_sp->lat, curr_sp->lon,
+								   _mission_item.yaw, _navigator->get_loiter_radius() * 0.5f,
+								   &curr_sp->lat, &curr_sp->lon);
+					_mission_item.lat = curr_sp->lat;
+					_mission_item.lon = curr_sp->lon;
+
 					_navigator->set_position_setpoint_triplet_updated();
-				}
-
-			} else {
-				/* restore SETPOINT_TYPE_POSITION */
-				if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-					/* loiter acceptance criteria required to revert back to SETPOINT_TYPE_POSITION */
-					if ((dist >= 0.0f)
-					    && (dist_z < _navigator->get_loiter_radius())
-					    && (dist_xy <= _navigator->get_loiter_radius() * 1.2f)) {
-
-						curr_sp->type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-						_navigator->set_position_setpoint_triplet_updated();
-					}
 				}
 			}
 		}
@@ -312,8 +312,15 @@ MissionBlock::is_mission_item_reached()
 
 			}
 
-			if (dist >= 0.0f && dist <= mission_acceptance_radius
-			    && dist_z <= _navigator->get_altitude_acceptance_radius()) {
+			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
+
+			float radius = 1.2f *_navigator->get_loiter_radius();
+
+			if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
+				if (dist >= 0.0f && dist <= radius && dist_z <= 20.f) {
+					_waypoint_position_reached = true;
+				}
+			} else if (dist_xy >= 0.0f && dist_xy <= mission_acceptance_radius && dist_z <= _navigator->get_altitude_acceptance_radius()) {
 				_waypoint_position_reached = true;
 			}
 		}
@@ -327,6 +334,8 @@ MissionBlock::is_mission_item_reached()
 	/* Check if the waypoint and the requested yaw setpoint. */
 
 	if (_waypoint_position_reached && !_waypoint_yaw_reached) {
+
+		position_setpoint_s &curr_sp = _navigator->get_position_setpoint_triplet()->current;
 
 		if ((_navigator->get_vstatus()->is_rotary_wing && PX4_ISFINITE(_navigator->get_yaw_acceptance(_mission_item.yaw)))
 		    || ((_mission_item.nav_cmd == NAV_CMD_LOITER_TO_ALT) && _mission_item.force_heading
@@ -354,6 +363,19 @@ MissionBlock::is_mission_item_reached()
 				_navigator->set_mission_failure("unable to reach heading within timeout");
 			}
 
+		} else  if (curr_sp.type == position_setpoint_s::SETPOINT_TYPE_LOITER){
+
+			float cog = atan2f(
+					    _navigator->get_local_position()->vy,
+					    _navigator->get_local_position()->vx
+				    );
+
+			float yaw_err = wrap_pi(_mission_item.yaw - cog);
+
+			/* accept yaw if reached or if timeout is set in which case we ignore not forced headings */
+			if (yaw_err < 0 && fabsf(yaw_err) < _navigator->get_yaw_threshold()) {
+				_waypoint_yaw_reached = true;
+			}
 		} else {
 			_waypoint_yaw_reached = true;
 		}
