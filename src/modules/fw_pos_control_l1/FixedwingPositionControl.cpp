@@ -412,7 +412,7 @@ FixedwingPositionControl::manual_control_setpoint_poll() {
     orb_check(_manual_control_sub, &manual_updated);
 
     if (manual_updated) {
-        mavlink_log_critical(&_mavlink_log_pub, "Updated manual control");
+        //mavlink_log_critical(&_mavlink_log_pub, "Updated manual control");
         _manual_mode_last_updated = hrt_absolute_time();
         orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
     }
@@ -920,7 +920,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
     if (_manual_mode_enabled) {
         if (hrt_elapsed_time(&_manual_mode_last_updated) > 30e6) {
-            mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
+            //mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
             _launch_detection_notify = hrt_absolute_time();
             _manual_mode_enabled = false;
             set_mode(157, 4, 4);
