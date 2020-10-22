@@ -380,7 +380,7 @@ FixedwingPositionControl::manual_control_setpoint_poll() {
     orb_check(_manual_control_sub, &manual_updated);
 
     if (manual_updated) {
-        mavlink_log_critical(&_mavlink_log_pub, "Updated manual control");
+       // mavlink_log_critical(&_mavlink_log_pub, "Updated manual control");
         _manual_mode_last_updated = hrt_absolute_time();
         orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
     }
@@ -850,7 +850,6 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     if (_manual_mode_enabled) {
         if (hrt_elapsed_time(&_manual_mode_last_updated) > 30e6) {
             mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
-            _launch_detection_notify = hrt_absolute_time();
             _manual_mode_enabled = false;
 
             set_mode(157, 4, 4);
@@ -1456,7 +1455,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             /* Perform launch detection */
 
             // create virtual waypoint in 500m ahead before takeoff
-            get_waypoint_heading_distance(_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+            Eulerf euler(Quatf(_att.q));
+            get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
             _takeoff_ground_alt = _global_pos.alt;
 
             /* Inform user that launchdetection is running every 4s */
@@ -1495,7 +1495,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
-        if (_parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
+        if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
             /* enforce a minimum of 10 degrees pitch up on takeoff, or take parameter */
 
             Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
@@ -1524,6 +1524,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
 
         } else {
+            climbout_completed = true;
 
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
@@ -1596,9 +1597,10 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         drop_parachute();
         parachute_dropped = true;
 
+        play_tune(11);
         set_mode();
         set_arm(false);
-        play_tune(11);
+
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,

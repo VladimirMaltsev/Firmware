@@ -149,36 +149,60 @@ MissionBlock::is_mission_item_reached()
 				&dist_xy, &dist_z);
 
 		/* FW special case for NAV_CMD_WAYPOINT to achieve altitude via loiter */
-		if (!_navigator->get_vstatus()->is_rotary_wing &&
-		    (_mission_item.nav_cmd == NAV_CMD_WAYPOINT)) {
-
+		if (!_navigator->get_vstatus()->is_rotary_wing && (_mission_item.nav_cmd == NAV_CMD_WAYPOINT)) {
 			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
 
-			/* close to waypoint, 15m, but alt error is big */
-			if ((dist >= 0.0f) && (dist_z > _navigator->get_altitude_acceptance_radius()) && (dist_xy < 15.f)) {
-				_needing_loiter = true;
-			}
+			if (!checked && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+				checked = true;
 
-			if ((dist_xy > 15.f) && _needing_loiter) {
-				_needing_loiter = false;
-				/* SETPOINT_TYPE_POSITION -> SETPOINT_TYPE_LOITER */
-				if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+				//mavlink_log_critical(&_mavlink_log_pub, "checking...");
 
-					curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
-					curr_sp->loiter_radius = _navigator->get_loiter_radius();
-					curr_sp->loiter_direction = 1;
+				struct position_setpoint_s *prev_sp = &_navigator->get_position_setpoint_triplet()->previous;
+				struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
 
-					const position_setpoint_s &next_sp = _navigator->get_position_setpoint_triplet()->next;
-					_mission_item.yaw  = get_bearing_to_next_waypoint(next_sp.lat, next_sp.lon, curr_sp->lat, curr_sp->lon);
+				float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp->lat, curr_sp->lon);
+				float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp->lat, curr_sp->lon, next_sp->lat, next_sp->lon);
 
+				float angle = wrap_pi(curr_next_bearing - prev_curr_bearing);
+
+				if (fabs(angle) > loiter_threshold || fabs(curr_sp->alt - next_sp->alt) > _navigator->get_altitude_acceptance_radius()){
+					_needing_loiter = true;
+					if (angle >= loiter_threshold && angle <= M_PI_2_F || angle >= -M_PI_F && angle <= -M_PI_2_F){
+						loiter_direction = -1;
+					} else {
+						loiter_direction = 1;
+					}
 					waypoint_from_heading_and_distance(curr_sp->lat, curr_sp->lon,
-								   _mission_item.yaw, _navigator->get_loiter_radius() * 0.5f,
-								   &curr_sp->lat, &curr_sp->lon);
+								prev_curr_bearing, 20.f,
+								&curr_sp->lat, &curr_sp->lon);
+
 					_mission_item.lat = curr_sp->lat;
 					_mission_item.lon = curr_sp->lon;
-
 					_navigator->set_position_setpoint_triplet_updated();
 				}
+			}
+
+			if (dist_xy < 20.f && _needing_loiter && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+				//mavlink_log_critical(&_mavlink_log_pub, "dist < 20, switch to loiter");
+
+				_needing_loiter = false;
+
+				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
+				curr_sp->loiter_radius = _navigator->get_loiter_radius();
+				curr_sp->loiter_direction = loiter_direction;
+
+
+				struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
+				_mission_item.yaw  = get_bearing_to_next_waypoint(next_sp->lat, next_sp->lon, curr_sp->lat, curr_sp->lon);
+
+				waypoint_from_heading_and_distance(curr_sp->lat, curr_sp->lon,
+								_mission_item.yaw, 50.f,
+								&curr_sp->lat, &curr_sp->lon);
+
+				_mission_item.lat = curr_sp->lat;
+				_mission_item.lon = curr_sp->lon;
+
+				_navigator->set_position_setpoint_triplet_updated();
 			}
 		}
 
@@ -320,7 +344,7 @@ MissionBlock::is_mission_item_reached()
 				if (dist >= 0.0f && dist <= radius && dist_z <= 20.f) {
 					_waypoint_position_reached = true;
 				}
-			} else if (dist_xy >= 0.0f && dist_xy <= mission_acceptance_radius && dist_z <= _navigator->get_altitude_acceptance_radius()) {
+			} else if (!_needing_loiter && dist_xy >= 0.0f && dist_xy <= mission_acceptance_radius && dist_z <= _navigator->get_altitude_acceptance_radius()) {
 				_waypoint_position_reached = true;
 			}
 		}
@@ -373,11 +397,12 @@ MissionBlock::is_mission_item_reached()
 			float yaw_err = wrap_pi(_mission_item.yaw - cog);
 
 			/* accept yaw if reached or if timeout is set in which case we ignore not forced headings */
-			if (yaw_err < 0 && fabsf(yaw_err) < _navigator->get_yaw_threshold()) {
+			if (loiter_direction * yaw_err < 0 && fabsf(yaw_err) < _navigator->get_yaw_threshold()) {
 				_waypoint_yaw_reached = true;
 			}
 		} else {
-			_waypoint_yaw_reached = true;
+			if (!_needing_loiter);
+				_waypoint_yaw_reached = true;
 		}
 	}
 
@@ -419,7 +444,8 @@ MissionBlock::is_mission_item_reached()
 								   bearing, curr_sp.loiter_radius,
 								   &curr_sp.lat, &curr_sp.lon);
 			}
-
+			checked = false;
+			_needing_loiter = false;
 			return true;
 		}
 	}

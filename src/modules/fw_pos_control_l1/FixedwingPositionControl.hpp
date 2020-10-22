@@ -277,6 +277,7 @@ private:
     RunwayTakeoff _runway_takeoff;
 
     bool _last_manual{false};				///< true if the last iteration was in manual mode (used to determine when a reset is needed)
+    bool climbout_completed{false};
 
     /* throttle and airspeed states */
     bool _airspeed_valid{false};				///< flag if a valid airspeed estimate exists
