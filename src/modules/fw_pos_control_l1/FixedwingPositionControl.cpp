@@ -1593,7 +1593,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             /* Perform launch detection */
 
             // create virtual waypoint in 500m ahead before takeoff
-            get_waypoint_heading_distance(_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+            Eulerf euler(Quatf(_att.q));
+            get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
             _takeoff_ground_alt = _global_pos.alt;
 
             /* Inform user that launchdetection is running every 4s */
@@ -1632,7 +1633,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
-        if (_parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
+        if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
 
             Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
             Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
@@ -1661,6 +1662,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
 
         } else {
+            climbout_completed - true;
 
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
