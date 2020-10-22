@@ -401,7 +401,7 @@ MissionBlock::is_mission_item_reached()
 				_waypoint_yaw_reached = true;
 			}
 		} else {
-			if (!_needing_loiter);
+			if (!_needing_loiter)
 				_waypoint_yaw_reached = true;
 		}
 	}
