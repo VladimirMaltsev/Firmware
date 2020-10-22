@@ -1738,9 +1738,9 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         drop_parachute();
         parachute_dropped = true;
 
+        play_tune(11);
         set_mode();
         set_arm(false);
-        play_tune(11);
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,
