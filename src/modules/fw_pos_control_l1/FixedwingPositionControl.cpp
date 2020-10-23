@@ -357,11 +357,13 @@ FixedwingPositionControl::engine_status_poll() {
 
         } else if (_ess.eng_st == 4){
             if (!_control_mode.flag_armed && _vehicle_land_detected.landed) {
-                release_parachute();
-            }
-        } else if (_ess.eng_st == 5){
-            if (!_control_mode.flag_armed && _vehicle_land_detected.landed) {
-                close_parachute();
+                if (!checking_parachute) {
+                    release_parachute();
+                    checking_parachute = true;
+                } else{
+                    close_parachute();
+                    checking_parachute = false;
+                }
             }
         }
     }

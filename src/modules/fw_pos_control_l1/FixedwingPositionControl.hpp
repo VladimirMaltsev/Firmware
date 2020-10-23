@@ -150,6 +150,7 @@ public:
     int print_status() override;
     bool parachute_released = false;
     bool parachute_dropped = false;
+    bool checking_parachute = false;
 
     bool ready_to_fly = false;
 
