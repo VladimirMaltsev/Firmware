@@ -332,6 +332,9 @@ MavlinkReceiver::evaluate_target_ok(int command, int target_system, int target_c
 	case MAV_CMD_REQUEST_MESSAGE:
 		target_ok = true;
 		break;
+	case MAV_CMD_DO_DIGICAM_CONTROL:
+		target_ok = true;
+		break;
 	default:
 		target_ok = (target_system == mavlink_system.sysid) && ((target_component == mavlink_system.compid)
 				|| (target_component == MAV_COMP_ID_ALL));
