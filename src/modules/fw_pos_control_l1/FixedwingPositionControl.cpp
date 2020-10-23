@@ -433,12 +433,15 @@ FixedwingPositionControl::airspeed_poll() {
             && (as.indicated_airspeed_m_s > 0.0f)
             && !_vehicle_status.aspd_use_inhibit) {
 
-            airspeed_valid = true;
-
-            _airspeed_last_valid = as.timestamp;
             _airspeed = as.indicated_airspeed_m_s;
 
-            _eas2tas = constrain(as.true_airspeed_m_s / as.indicated_airspeed_m_s, 0.9f, 2.0f);
+             if (_airspeed > _parameters.airspeed_max + 3.f){
+                airspeed_valid = false;
+            }else {
+                _airspeed_last_valid = as.timestamp;
+                airspeed_valid = true;
+                _eas2tas = constrain(as.true_airspeed_m_s / as.indicated_airspeed_m_s, 0.9f, 2.0f);
+            }
         }
 
     } else {
