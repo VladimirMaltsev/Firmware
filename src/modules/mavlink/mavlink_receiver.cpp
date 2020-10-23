@@ -336,6 +336,9 @@ MavlinkReceiver::evaluate_target_ok(int command, int target_system, int target_c
 	case MAV_CMD_REQUEST_MESSAGE:
 		target_ok = true;
 		break;
+	case MAV_CMD_DO_DIGICAM_CONTROL:
+		target_ok = true;
+		break;
 	default:
 		target_ok = (target_system == mavlink_system.sysid) && ((target_component == mavlink_system.compid)
 				|| (target_component == MAV_COMP_ID_ALL));
@@ -435,7 +438,7 @@ MavlinkReceiver::handle_message_command_long(mavlink_message_t *msg)
 	vcmd.confirmation = cmd_mavlink.confirmation;
 	vcmd.from_external = true;
 
-	//mavlink_log_critical(&_mavlink_log_pub, "p1 = %3.3f p2 = %3.3f p3 = %3.3f p4 = %3.3f p5 = %3.3f p6 = %3.3f", vcmd.param1, vcmd.param2, vcmd.param3, vcmd.param4, vcmd.param5, vcmd.param6);
+	mavlink_log_critical(&_mavlink_log_pub, "ts=%d tc=%d ss=%d sc=%d p=%3.3f p2=%3.3f p3=%3.3f p4=%3.3f p5=%3.3f p6=%3.3f", vcmd.target_system, vcmd.target_component, vcmd.source_system, vcmd.source_component, vcmd.param1, vcmd.param2, vcmd.param3, vcmd.param4, vcmd.param5, vcmd.param6);
 
 	handle_message_command_both(msg, cmd_mavlink, vcmd);
 }
