@@ -85,22 +85,42 @@ GpsFailure::on_activation()
 
 void
 GpsFailure::manual_control_setpoint_poll() {
-    bool manual_updated = false;
-    orb_check(_manual_control_sub, &manual_updated);
+	bool manual_updated = false;
+	orb_check(_manual_control_sub, &manual_updated);
 
-    if (manual_updated) {
-        orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
-    }
+	if (manual_updated) {
+		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "new manual setpoints");
+		orb_copy(ORB_ID(manual_control_setpoint), _manual_control_sub, &_manual);
+	}
 }
 
 void
 GpsFailure::vehicle_control_mode_poll() {
-    bool updated = false;
-    orb_check(_control_mode_sub, &updated);
+	bool updated = false;
+	orb_check(_control_mode_sub, &updated);
 
-    if (updated) {
-	orb_copy(ORB_ID(vehicle_control_mode), _control_mode_sub, &_control_mode);
-    }
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_control_mode), _control_mode_sub, &_control_mode);
+		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "updated control mode");
+		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",
+			_control_mode.flag_external_manual_override_ok,
+			_control_mode.flag_control_manual_enabled,
+			_control_mode.flag_control_auto_enabled,
+			_control_mode.flag_control_offboard_enabled,
+			_control_mode.flag_control_rates_enabled,
+			_control_mode.flag_control_attitude_enabled,
+			_control_mode.flag_control_rattitude_enabled,
+			_control_mode.flag_control_force_enabled,
+			_control_mode.flag_control_acceleration_enabled,
+			_control_mode.flag_control_velocity_enabled,
+			_control_mode.flag_control_position_enabled,
+			_control_mode.flag_control_altitude_enabled,
+			_control_mode.flag_control_climb_rate_enabled,
+			_control_mode.flag_control_termination_enabled,
+			_control_mode.flag_control_fixed_hdg_enabled
+);
+
+	}
 }
 
 void
@@ -112,6 +132,8 @@ GpsFailure::on_active()
 		manual_control_setpoint_poll();
 
 		bool alt_mode = _control_mode.flag_control_altitude_enabled;
+		if (alt_mode)
+			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Altitude mode");
 		/* Position controller does not run in this mode:
 		* navigator has to publish an attitude setpoint */
 		vehicle_attitude_setpoint_s att_sp = {};

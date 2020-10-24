@@ -1247,7 +1247,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         /* Copy thrust and pitch values from tecs */
         if (_vehicle_land_detected.landed) {
             // when we are landed state we want the motor to spin at idle speed
-            _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
+            _att_sp.thrust_body[0] = min(0.3f, throttle_max);
         } else {
             _att_sp.thrust_body[0] = min(get_tecs_thrust(), throttle_max);
         }
@@ -1679,19 +1679,23 @@ FixedwingPositionControl::run() {
     /* Setup of loop */
     fds[0].fd = _global_pos_sub;
     fds[0].events = POLLIN;
+    mavlink_log_critical(&_mavlink_log_pub, "RUN()");
 
     while (!should_exit()) {
+        mavlink_log_critical(&_mavlink_log_pub, "_______iter_______");
 
         /* wait for up to 500ms for data */
         int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
-        /* timed out - periodic check for _task_should_exit, etc. */
-        if (pret == 0) {
-            continue;
-        }
+        // /* timed out - periodic check for _task_should_exit, etc. */
+        // if (pret == 0) {
+        //     mavlink_log_critical(&_mavlink_log_pub, "pret = 0");
+        //     continue;
+        // }
 
         /* this is undesirable but not much we can do - might want to flag unhappy status */
         if (pret < 0) {
+            mavlink_log_critical(&_mavlink_log_pub, "pret < 0");
             PX4_WARN("poll error %d, %d", pret, errno);
             continue;
         }
@@ -1710,7 +1714,7 @@ FixedwingPositionControl::run() {
         }
 
         /* only run controller if position changed */
-        if ((fds[0].revents & POLLIN) != 0) {
+        if (true || (fds[0].revents & POLLIN) != 0) {
             perf_begin(_loop_perf);
 
             /* load local copies */
@@ -1795,6 +1799,8 @@ FixedwingPositionControl::run() {
                         status_publish();
                     }
                 }
+            } else{
+                mavlink_log_critical(&_mavlink_log_pub, "not control position");
             }
 
             perf_end(_loop_perf);
