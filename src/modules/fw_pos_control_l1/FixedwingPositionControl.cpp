@@ -1264,9 +1264,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _att_sp.thrust_body[0] = 0.f;
         if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
             release_parachute();
+            play_tune(11);
             set_mode();
             set_arm(false);
-            play_tune(11);
         }
     }
 
@@ -1693,10 +1693,10 @@ FixedwingPositionControl::run() {
         /* wait for up to 500ms for data */
         int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
-        /* timed out - periodic check for _task_should_exit, etc. */
-        if (pret == 0) {
-            continue;
-        }
+        // /* timed out - periodic check for _task_should_exit, etc. */
+        // if (pret == 0) {
+        //     continue;
+        // }
 
         /* this is undesirable but not much we can do - might want to flag unhappy status */
         if (pret < 0) {
@@ -1717,8 +1717,8 @@ FixedwingPositionControl::run() {
             parameters_update();
         }
 
-        /* only run controller if position changed */
-        if ((fds[0].revents & POLLIN) != 0) {
+        /* always run controller */
+        if (true || (fds[0].revents & POLLIN) != 0) {
             perf_begin(_loop_perf);
 
             /* load local copies */
@@ -1759,6 +1759,10 @@ FixedwingPositionControl::run() {
 
             Vector2f curr_pos((float) _global_pos.lat, (float) _global_pos.lon);
             Vector2f ground_speed(_global_pos.vel_n, _global_pos.vel_e);
+
+            if (pret == 0 && !_control_mode.flag_control_altitude_enabled ) {
+                continue;
+            }
 
             /*
             * Attempt to control position, on success (= sensors present and not in manual mode),
