@@ -40,6 +40,7 @@
 #include "gpsfailure.h"
 #include "navigator.h"
 
+#include <modules/px4iofirmware/px4io.h>
 #include <systemlib/mavlink_log.h>
 #include <lib/ecl/geo/geo.h>
 #include <navigator/navigation.h>
@@ -127,25 +128,21 @@ GpsFailure::on_active()
 
 	case GPSF_STATE_TERMINATE:
 	{
+		px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+		px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
 		px4_usleep(2*1000000);
-		int sys_autostart = 0;
-		param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
+
 		vehicle_attitude_setpoint_s att_sp = {};
 		att_sp.thrust_body[0] = 0.f;
+		orb_advertise(ORB_ID(vehicle_attitude_setpoint), &att_sp);
+
 		struct actuator_controls_s act1 = {};
-
-		if (sys_autostart == 3239) {
-			act1.control[5] = 0.65f;
-		}
-		if (sys_autostart == 2101) {
-			act1.control[5] = -0.97f; //parachute drop
-			act1.control[6] = 0.15f; //buffer drop
-		}
-
+		act1.control[5] = -0.97f; //parachute release
 		act1.timestamp = hrt_absolute_time();
+		orb_advertise(ORB_ID(actuator_controls_1), &act1);
 
-		orb_advert_t    act_pub1{nullptr};
-		act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+		mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+		px4_usleep(4*1000000);
 
 		//-SET-MODE-START-----------------------------
 		vehicle_command_s vcmd_mode = {};
@@ -161,14 +158,7 @@ GpsFailure::on_active()
 		vcmd_mode.source_component = 0;
 		vcmd_mode.confirmation = 0;
 		vcmd_mode.from_external = true;
-
-		orb_advert_t _cmd_pub_mode{nullptr};
-		if (_cmd_pub_mode == nullptr) {
-			_cmd_pub_mode = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		} else {
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub_mode, &vcmd_mode);
-		}
+		orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_mode, vehicle_command_s::ORB_QUEUE_LENGTH);
 		//-SET-MODE-END-----------------------------
 
 		vehicle_command_s vcmd_disarm = {};
@@ -187,15 +177,8 @@ GpsFailure::on_active()
 		vcmd_disarm.source_component = 0;
 		vcmd_disarm.confirmation = 0;
 		vcmd_disarm.from_external = true;
+		orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
 
-		orb_advert_t _cmd_pub1{nullptr};
-		if (_cmd_pub1 == nullptr) {
-			_cmd_pub1 = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_disarm, vehicle_command_s::ORB_QUEUE_LENGTH);
-
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-		} else {
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub1, &vcmd_disarm);
-		}
 		set_gpsf_item();
 		advance_gpsf();
 		break;
