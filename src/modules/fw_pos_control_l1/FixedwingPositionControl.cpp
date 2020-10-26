@@ -404,7 +404,7 @@ FixedwingPositionControl::airspeed_poll() {
 
             _eas2tas = constrain(as.true_airspeed_m_s / as.indicated_airspeed_m_s, 0.9f, 2.0f);
 
-            if (_airspeed > _parameters.airspeed_max + 3.f){
+            if (climbout_completed && (_airspeed > (_parameters.airspeed_max + 1.f) || _airspeed < (_parameters.airspeed_min - 1.f))){
                 airspeed_valid = false;
             }else {
                 airspeed_valid = true;
@@ -496,7 +496,11 @@ FixedwingPositionControl::calculate_target_airspeed(float airspeed_demand) {
 
     // add minimum ground speed undershoot (only non-zero in presence of sufficient wind)
     // sanity check: limit to range
-    return constrain(airspeed_demand + _groundspeed_undershoot, adjusted_min_airspeed, _parameters.airspeed_max);
+    float airspd_max = _parameters.airspeed_max;
+    if (!_airspeed_valid){
+        airspd_max = _parameters.airspeed_trim;
+    }
+    return constrain(airspeed_demand + _groundspeed_undershoot, adjusted_min_airspeed, airspd_max);
 }
 
 void
@@ -1025,7 +1029,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                        calculate_target_airspeed(mission_airspeed),
                                        radians(_parameters.pitch_limit_min) - _parameters.pitchsp_offset_rad,
                                        radians(_parameters.pitch_limit_max) - _parameters.pitchsp_offset_rad,
-                                       _parameters.throttle_min,
+                                       _airspeed_valid ? _parameters.throttle_min : _parameters.throttle_cruise,
                                        _parameters.throttle_max,            //may be min?
                                        mission_throttle,                    // may be min?
                                        false,
@@ -1856,6 +1860,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
                                                      float throttle_min, float throttle_max, float throttle_cruise,
                                                      bool climbout_mode, float climbout_pitch_min_rad,
                                                      uint8_t mode) {
+
     float dt = 0.01f; // prevent division with 0
 
     if (_last_tecs_update > 0) {
