@@ -470,7 +470,7 @@ template <class T>
 void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const T &cmd_mavlink,
 		const vehicle_command_s &vehicle_command)
 {
-	mavlink_log_critical(&_mavlink_log_pub, "cmd = %d mess_id = %d, index = %d", cmd_mavlink.command, (uint16_t)roundf(vehicle_command.param1), (uint16_t)roundf(vehicle_command.param2));
+	//mavlink_log_critical(&_mavlink_log_pub, "cmd = %d mess_id = %d, index = %d", cmd_mavlink.command, (uint16_t)roundf(vehicle_command.param1), (uint16_t)roundf(vehicle_command.param2));
 	bool target_ok = evaluate_target_ok(cmd_mavlink.command, cmd_mavlink.target_system, cmd_mavlink.target_component);
 
 	bool send_ack = true;
