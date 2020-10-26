@@ -656,8 +656,11 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		//_mavlink->send_statustext_critical("send STG_ACTION");
 		vehicle_command_s vcmd_stg = vehicle_command;
 		vcmd_stg.from_external = false;
-		if (vehicle_command.param1 == 1)
-			mavlink_log_critical(&_mavlink_log_pub, "Starter ON");
+		if (vehicle_command.param1 == 1) {
+			px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
+			mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
+		}
 		if (_cmd_pub == nullptr)
 			_cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
 		else
