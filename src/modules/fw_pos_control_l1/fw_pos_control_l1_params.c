@@ -727,3 +727,27 @@ PARAM_DEFINE_FLOAT(FW_T_HRATE_FF, 0.8f);
  * @group FW TECS
  */
 PARAM_DEFINE_FLOAT(FW_T_SRATE_P, 0.02f);
+
+/**
+ * value for parachute release
+ *
+ * Set to normalized offset
+ *
+ * @min -1
+ * @max 2200
+ * @unit us
+ * @group PWM Outputs
+ */
+PARAM_DEFINE_INT32(PWM_PRCHT_REL, 1000);
+
+/**
+ * value for parachute release
+ *
+ * Set to normalized offset
+ *
+ * @min -1
+ * @max 2200
+ * @unit us
+ * @group PWM Outputs
+ */
+PARAM_DEFINE_INT32(PWM_PRCHT_DROP, 1001);

@@ -420,6 +420,9 @@ private:
 
         param_t loiter_radius;
         param_t sys_autostart;
+        param_t pwm_parachute_release;
+        param_t pwm_parachute_drop;
+
 
         param_t vtol_type;
     } _parameter_handles {};				///< handles for interesting parameters */
