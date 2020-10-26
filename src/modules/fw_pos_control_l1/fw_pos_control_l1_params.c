@@ -738,10 +738,10 @@ PARAM_DEFINE_FLOAT(FW_T_SRATE_P, 0.02f);
  * @unit us
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_PRCHT_REL, 1000);
+PARAM_DEFINE_INT32(PWM_PRCHT_REL, 1500);
 
 /**
- * value for parachute release
+ * value for parachute drop
  *
  * Set to normalized offset
  *
@@ -750,4 +750,68 @@ PARAM_DEFINE_INT32(PWM_PRCHT_REL, 1000);
  * @unit us
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_PRCHT_DROP, 1001);
+PARAM_DEFINE_INT32(PWM_PRCHT_DROP, 1900);
+
+/**
+ * value for parachute close
+ *
+ * Set to close parachute campart
+ *
+ * @min -1
+ * @max 2200
+ * @unit us
+ * @group PWM Outputs
+ */
+PARAM_DEFINE_INT32(PWM_PRCHT_CLOSE, 1000);
+
+/**
+ * value for buffer release
+ *
+ * Set to buffer release
+ *
+ * @min -1
+ * @max 2200
+ * @unit us
+ * @group PWM Outputs
+ */
+PARAM_DEFINE_INT32(PWM_BUFFER_REL, 1500);
+
+/**
+ * value for parachute close
+ *
+ * Set to close parachute campart
+ *
+ * @min -1
+ * @max 2200
+ * @unit us
+ * @group PWM Outputs
+ */
+PARAM_DEFINE_INT32(PWM_BUFFER_DROP, 1000);
+
+/**
+ * value for min takeoff pitch
+ *
+ * Set to min climbout pitch to prevent falling
+ *
+ * @unit deg
+ * @min 0.0
+ * @max 30.0
+ * @decimal 1
+ * @increment 0.5
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FW_MIN_CLMB_PTCH, 10.f);
+
+/**
+ * value for target altitude when gps failsafe
+ *
+ * Set to gps failsafe altitude
+ *
+ * @unit m
+ * @min 0.0
+ * @max 1000.0
+ * @decimal 1
+ * @increment 0.5
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FW_GPSF_ALT, 500.f);

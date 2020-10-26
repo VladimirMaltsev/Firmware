@@ -422,6 +422,10 @@ private:
         param_t sys_autostart;
         param_t pwm_parachute_release;
         param_t pwm_parachute_drop;
+        param_t pwm_parachute_close;
+        param_t pwm_buffer_drop;
+        param_t pwm_buffer_release;
+        param_t fw_min_clmb_pitch;
 
 
         param_t vtol_type;

@@ -107,6 +107,10 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.speedrate_p = param_find("FW_T_SRATE_P");
     _parameter_handles.pwm_parachute_release = param_find("PWM_PRCHT_REL");
     _parameter_handles.pwm_parachute_drop = param_find("PWM_PRCHT_DROP");
+    _parameter_handles.pwm_parachute_close = param_find("PWM_PRCHT_CLOSE");
+    _parameter_handles.pwm_buffer_drop = param_find("PWM_BUFFER_DROP");
+    _parameter_handles.pwm_buffer_release = param_find("PWM_BUFFER_REL");
+    _parameter_handles.fw_min_clmb_pitch = param_find("FW_MIN_CLMB_PTCH");
 
     // if vehicle is vtol these handles will be set when we get the vehicle status
     _parameter_handles.airspeed_trans = PARAM_INVALID;

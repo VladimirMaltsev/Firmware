@@ -63,7 +63,8 @@ private:
 		(ParamFloat<px4::params::NAV_GPSF_LT>) _param_nav_gpsf_lt,
 		(ParamFloat<px4::params::NAV_GPSF_R>) _param_nav_gpsf_r,
 		(ParamFloat<px4::params::NAV_GPSF_P>) _param_nav_gpsf_p,
-		(ParamFloat<px4::params::NAV_GPSF_TR>) _param_nav_gpsf_tr
+		(ParamFloat<px4::params::NAV_GPSF_TR>) _param_nav_gpsf_tr,
+		(ParamFloat<px4::params::FW_GPSF_ALT>) _param_fw_gpsf_alt
 	)
 
 	enum GPSFState {
