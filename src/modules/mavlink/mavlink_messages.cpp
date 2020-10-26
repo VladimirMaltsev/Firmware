@@ -5045,25 +5045,29 @@ protected:
 
         struct adc_report_s _adc_report = {};
 
-        if (_sub->update(&_adc_report_time, &_adc_report)) {
+	if (_sub->update_if_changed(&_adc_report)) {
+		orb_advert_t	_mavlink_log_pub{nullptr};
+		mavlink_log_info(&_mavlink_log_pub, "adc updated");
+        // if (_sub->update(&_adc_report_time, &_adc_report)) {
            	 mavlink_adc_report_t _msg_adc_report;
 
-			for (int i = 0; i < 12; i ++){
-				_msg_adc_report.channel_id[i] = _adc_report.channel_id[i];
-				_msg_adc_report.channel_value[i] = _adc_report.channel_value[i];
-			}
-
-			float tempVolt = _adc_report.channel_value[10];
-			int temp = 190;
-			for (; temp >= 0; temp--) {
-				if (tempVolt < NTC_temp[temp]){
-					temp -= 40;
-					break;
-				}
-			}
-			_adc_report.channel_value[10] = temp;
-			mavlink_msg_adc_report_send_struct(_mavlink->get_channel(), &_msg_adc_report);
+		for (int i = 0; i < 12; i ++){
+			_msg_adc_report.channel_id[i] = _adc_report.channel_id[i];
+			_msg_adc_report.channel_value[i] = _adc_report.channel_value[i];
 		}
+
+		float tempVolt = _adc_report.channel_value[10];
+		int temp = 190;
+		for (; temp >= 0; temp--) {
+			if (tempVolt < NTC_temp[temp]){
+				temp -= 40;
+				break;
+			}
+		}
+		mavlink_log_info(&_mavlink_log_pub, "adc sended");
+		_msg_adc_report.channel_value[10] = temp;
+		mavlink_msg_adc_report_send_struct(_mavlink->get_channel(), &_msg_adc_report);
+	}
 
         return true;
     }
