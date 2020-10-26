@@ -561,7 +561,10 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		px4_sleep(2);
 
 		if (sys_autostart == 3239) {
-			act1.control[5] = 0.65f;
+			float pwm_release = 0.f;
+			param_get(param_find("PWM_PRCHT_REL"), &pwm_release);
+			mavlink_log_critical(&_mavlink_log_pub, "PWM_REL = %f", pwm_release);
+			act1.control[5] = (pwm_release - 1000.f) / 1000.f; //0.65f;
 		} else if (sys_autostart == 2101){
 			act1.control[5] = -0.97f;
 			act1.control[6] = 0.15f;

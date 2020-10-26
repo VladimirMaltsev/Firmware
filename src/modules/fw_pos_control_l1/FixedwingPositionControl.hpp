@@ -352,6 +352,12 @@ private:
 
         float loiter_radius;
         int32_t sys_autostart;
+        float pwm_parachute_release;
+        float pwm_parachute_drop;
+        float pwm_parachute_close;
+        float pwm_buffer_drop;
+        float pwm_buffer_release;
+        float fw_min_clmb_pitch;
 
         // VTOL
         float airspeed_trans;

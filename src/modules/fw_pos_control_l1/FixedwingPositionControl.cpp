@@ -166,6 +166,12 @@ FixedwingPositionControl::parameters_update() {
     param_get(_parameter_handles.land_throtTC_scale, &(_parameters.land_throtTC_scale));
     param_get(_parameter_handles.loiter_radius, &(_parameters.loiter_radius));
     param_get(_parameter_handles.sys_autostart, &(_parameters.sys_autostart));
+    param_get(_parameter_handles.pwm_parachute_release, &(_parameters.pwm_parachute_release));
+    param_get(_parameter_handles.pwm_parachute_drop, &(_parameters.pwm_parachute_drop));
+    param_get(_parameter_handles.pwm_parachute_close, &(_parameters.pwm_parachute_close));
+    param_get(_parameter_handles.pwm_buffer_drop, &(_parameters.pwm_buffer_drop));
+    param_get(_parameter_handles.pwm_buffer_release, &(_parameters.pwm_buffer_release));
+
 
     // VTOL parameter VTOL_TYPE
     if (_parameter_handles.vtol_type != PARAM_INVALID) {
@@ -1395,7 +1401,8 @@ FixedwingPositionControl::play_tune(uint8_t id){
 void
 FixedwingPositionControl::release_parachute(){
      if (_parameters.sys_autostart == 3239) {
-        act1.control[5] = 0.65f;
+        (_parameters.pwm_parachute_release - 1000.f) / 1000.f;
+        act1.control[5] = (_parameters.pwm_parachute_release - 1000.f) / 1000.f; //0.65f;
     }else if (_parameters.sys_autostart == 2101) {
         act1.control[5] = -0.97f; //parachute drop
         act1.control[6] = 0.15f; //buffer drop

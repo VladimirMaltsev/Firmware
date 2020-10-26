@@ -733,60 +733,65 @@ PARAM_DEFINE_FLOAT(FW_T_SRATE_P, 0.02f);
  *
  * Set to normalized offset
  *
- * @min -1
- * @max 2200
- * @unit us
+ * @min 1000.0
+ * @max 2200.0
+ * @decimal 1
+ * @increment 0.5
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_PRCHT_REL, 1500);
+PARAM_DEFINE_FLOAT(PWM_PRCHT_REL, 1500.f);
 
 /**
  * value for parachute drop
  *
  * Set to normalized offset
  *
- * @min -1
- * @max 2200
- * @unit us
+ * @min 1000.0
+ * @max 2200.0
+ * @decimal 1
+ * @increment 0.5
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_PRCHT_DROP, 1900);
+PARAM_DEFINE_FLOAT(PWM_PRCHT_DROP, 1900.f);
 
 /**
  * value for parachute close
  *
  * Set to close parachute campart
  *
- * @min -1
- * @max 2200
- * @unit us
+ * @min 1000.0
+ * @max 2200.0
+ * @decimal 1
+ * @increment 0.5
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_PRCHT_CLOSE, 1000);
+PARAM_DEFINE_FLOAT(PWM_PRCHT_CLOSE, 1000.f);
 
 /**
  * value for buffer release
  *
  * Set to buffer release
  *
- * @min -1
- * @max 2200
- * @unit us
+ * @min 1000.0
+ * @max 2200.0
+ * @decimal 1
+ * @increment 0.5
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_BUFFER_REL, 1500);
+PARAM_DEFINE_FLOAT(PWM_BUFFER_REL, 1500.f);
 
 /**
  * value for parachute close
  *
  * Set to close parachute campart
  *
- * @min -1
- * @max 2200
- * @unit us
+ * @min 1000.0
+ * @max 2200.0
+ * @decimal 1
+ * @increment 0.5
  * @group PWM Outputs
  */
-PARAM_DEFINE_INT32(PWM_BUFFER_DROP, 1000);
+PARAM_DEFINE_FLOAT(PWM_BUFFER_DROP, 1000.f);
 
 /**
  * value for min takeoff pitch
