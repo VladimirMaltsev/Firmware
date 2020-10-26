@@ -1173,7 +1173,7 @@ void Logger::run()
 								cam_cap.seq, cam_cap.q[0], cam_cap.q[1], cam_cap.q[2],
 								cam_cap.alt, cam_cap.lat, cam_cap.lon,cam_cap.timestamp_utc);
 
-				mavlink_log_info(&_mavlink_log_pub, "s=%d %s", ret_s, message);
+				//mavlink_log_info(&_mavlink_log_pub, "s=%d %s", ret_s, message);
 				//_writer.write_message_straightforward(LogType::Mission, message, ret_s);
 				write_message(LogType::Mission, message, ret_s);
 			}

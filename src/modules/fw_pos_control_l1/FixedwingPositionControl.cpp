@@ -879,7 +879,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
     if (_control_mode.flag_control_auto_enabled && pos_sp_curr.valid) {
         /* AUTONOMOUS FLIGHT */
-
+        _manual_mode_enabled = false;
         _control_mode_current = FW_POSCTRL_MODE_AUTO;
 
         /* reset hold altitude */
