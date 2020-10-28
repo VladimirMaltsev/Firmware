@@ -560,14 +560,17 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 
 		px4_sleep(2);
 
+		float pwm_parachute_rel = 0.f;
+		float pwm_buffer_rel = 0.f;
+		param_get(param_find("PWM_PRCHT_REL"), &pwm_parachute_rel);
+		param_get(param_find("PWM_BUFFER_REL"), &pwm_buffer_rel);
+
+		mavlink_log_critical(&_mavlink_log_pub, "PWM_REL = %f", pwm_parachute_rel);
 		if (sys_autostart == 3239) {
-			float pwm_release = 0.f;
-			param_get(param_find("PWM_PRCHT_REL"), &pwm_release);
-			mavlink_log_critical(&_mavlink_log_pub, "PWM_REL = %f", pwm_release);
-			act1.control[5] = (pwm_release - 1000.f) / 1000.f; //0.65f;
+			act1.control[5] = (pwm_parachute_rel - 1000.f) / 1000.f; //0.65f;
 		} else if (sys_autostart == 2101){
-			act1.control[5] = -0.97f;
-			act1.control[6] = 0.15f;
+			act1.control[5] = (pwm_parachute_rel - 1000.f) / 1000.f - 1.f; //-0.97f; //parachute drop
+        		act1.control[6] = (pwm_buffer_rel - 1000.f) / 1000.f; // 0.15f; //buffer drop
 		} else {
 			_mavlink->send_statustext_critical("Unsupported airframe");
 		}
@@ -598,11 +601,16 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		int sys_autostart = 0;
 		param_get(param_find("SYS_AUTOSTART"), &sys_autostart);
 
+		float pwm_parachute_drop = 0.f;
+		float pwm_buffer_drop = 0.f;
+		param_get(param_find("PWM_PRCHT_DROP"), &pwm_parachute_drop);
+		param_get(param_find("PWM_BUFFER_DROP"), &pwm_buffer_drop);
+
 		if (sys_autostart == 3239){
-			act1.control[5] = 0.9f;
+			act1.control[5] = (pwm_parachute_drop - 1000.f) / 1000.f; //0.9f;
 		} else if (sys_autostart == 2101) {
-			act1.control[7] = 1.0f;
-			act1.control[6] = 0.0;
+			act1.control[7] = (pwm_parachute_drop - 1000.f) / 1000.f; //1.f;
+			act1.control[6] = (pwm_buffer_drop - 1000.f) / 1000.f; // 0.0f; //buffer drop
 		} else {
 			_mavlink->send_statustext_critical("Unsupported airframe");
 		}

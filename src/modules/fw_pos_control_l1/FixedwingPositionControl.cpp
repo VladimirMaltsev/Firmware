@@ -171,6 +171,7 @@ FixedwingPositionControl::parameters_update() {
     param_get(_parameter_handles.pwm_parachute_close, &(_parameters.pwm_parachute_close));
     param_get(_parameter_handles.pwm_buffer_drop, &(_parameters.pwm_buffer_drop));
     param_get(_parameter_handles.pwm_buffer_release, &(_parameters.pwm_buffer_release));
+    param_get(_parameter_handles.fw_min_clmb_pitch, &(_parameters.fw_min_clmb_pitch));
 
 
     // VTOL parameter VTOL_TYPE
@@ -1401,11 +1402,10 @@ FixedwingPositionControl::play_tune(uint8_t id){
 void
 FixedwingPositionControl::release_parachute(){
      if (_parameters.sys_autostart == 3239) {
-        (_parameters.pwm_parachute_release - 1000.f) / 1000.f;
         act1.control[5] = (_parameters.pwm_parachute_release - 1000.f) / 1000.f; //0.65f;
     }else if (_parameters.sys_autostart == 2101) {
-        act1.control[5] = -0.97f; //parachute drop
-        act1.control[6] = 0.15f; //buffer drop
+        act1.control[5] = (_parameters.pwm_buffer_release - 1000.f) / 1000.f - 1.f; //-0.97f; //parachute drop
+        act1.control[6] = (_parameters.pwm_buffer_release - 1000.f) / 1000.f; // 0.15f; //buffer drop
     }
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
@@ -1419,10 +1419,11 @@ FixedwingPositionControl::release_parachute(){
 void
 FixedwingPositionControl::drop_parachute(){
     if (_parameters.sys_autostart == 3239){
-        act1.control[5] = 0.9f;
+
+        act1.control[5] = (_parameters.pwm_parachute_drop - 1000.f) / 1000.f; //0.9f;
     } else if (_parameters.sys_autostart == 2101) {
-        act1.control[7] = 1.0f;
-        act1.control[6] = 0.0;
+        act1.control[7] = (_parameters.pwm_parachute_drop - 1000.f) / 1000.f; //1.f;
+        act1.control[6] = (_parameters.pwm_buffer_drop - 1000.f) / 1000.f; // 0.0f; //buffer drop
     } else {
         mavlink_log_critical(&_mavlink_log_pub, "Unsupported airframe");
     }
@@ -1530,7 +1531,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             takeoff_throttle = 1.0f;
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(10.0f),
+                                        radians(_parameters.fw_min_clmb_pitch),
                                         radians(takeoff_pitch_max_deg),
                                         _parameters.throttle_min,
                                         takeoff_throttle,

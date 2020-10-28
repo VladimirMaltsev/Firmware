@@ -78,7 +78,8 @@ private:
 
 	orb_advert_t	_att_sp_pub{nullptr};
 	uORB::Subscription<vehicle_air_data_s>	_sub_airdata;
-	float _gps_failed_altitude{0};
+	float _gpsf_altitude{0.f};
+	float _gpsf_diff_alt{0.f};
 
 	/**
 	 * Set the GPSF item

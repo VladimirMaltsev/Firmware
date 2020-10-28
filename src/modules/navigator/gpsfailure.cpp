@@ -91,9 +91,9 @@ GpsFailure::on_active()
 			// get baro altitude
 			_sub_airdata.update();
 			const float baro_altitude_amsl = _sub_airdata.get().baro_alt_meter;
-			if (baro_altitude_amsl - _gps_failed_altitude < 500.f) {
+			if (baro_altitude_amsl - _gpsf_altitude < _gpsf_diff_alt) {
 				att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
-			} else if (baro_altitude_amsl - _gps_failed_altitude > 550.f){
+			} else if (baro_altitude_amsl - _gpsf_altitude > (_gpsf_diff_alt + 50.f)){
 				att_sp.pitch_body = math::radians(-5.f);
 			} else
 				att_sp.pitch_body = 0.f;
@@ -228,8 +228,9 @@ GpsFailure::advance_gpsf()
 
 		// get baro altitude
 		_sub_airdata.update();
-		_gps_failed_altitude = _sub_airdata.get().baro_alt_meter;
+		_gpsf_altitude = _sub_airdata.get().baro_alt_meter;
 
+		param_get(param_find("FW_GPSF_ALT"), &_gpsf_diff_alt);
 		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Global position failure: fixed bank loiter");
 		break;
 
