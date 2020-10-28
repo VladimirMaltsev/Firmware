@@ -342,20 +342,20 @@ FixedwingPositionControl::engine_status_poll() {
 
     if (updated) {
         orb_copy(ORB_ID(engine_status), _engine_status_sub, &_ess);
-        if (_ess.eng_st == 1)
+        if (_ess.eng_st == engine_status_s::ENGINE_IDLE_THROTTLE)
             ready_to_fly = false;
-        else if (_ess.eng_st == 2) {
+        else if (_ess.eng_st == engine_status_s::ENGINE_FULL_THROTTLE) {
             ready_to_fly = true;
-        } else if (_ess.eng_st == 3) {
+        } else if (_ess.eng_st == engine_status_s::ENGINE_LANDING_STATE) {
             is_landing = true;
-        } else if (!is_landing && _was_in_air && _ess.eng_st == 8 && !enable_engine_restart){
+        } else if (!is_landing && _was_in_air && _ess.eng_st == engine_status_s::ENGINE_NEED_RESTART && !enable_engine_restart){
             _engine_restart_thr_delay = hrt_absolute_time();
             enable_engine_restart = true;
 
             engine_enable(true);
             starter_enable(true);
 
-        } else if (_ess.eng_st == 4){
+        } else if (_ess.eng_st == engine_status_s::ENGINE_OPENING_PARACHUTE || _ess.eng_st == engine_status_s::ENGINE_CLOSING_PARACHUTE){
             if (!_control_mode.flag_armed && _vehicle_land_detected.landed) {
                 if (!checking_parachute) {
                     release_parachute();
@@ -1402,11 +1402,33 @@ void FixedwingPositionControl::engine_enable(bool enable){
 
     if (enable){
         mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
-    }else
-        mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+        vehicle_command_s vcmd_engine_off = {};
+        vcmd_engine_off.timestamp = hrt_absolute_time();
+        vcmd_engine_off.command = 27601;
+        vcmd_engine_off.param1 = 1;
+        vcmd_engine_off.target_component = 0;
+        vcmd_engine_off.target_system = 0;
+        vcmd_engine_off.source_system = 1;
+        vcmd_engine_off.source_component = 1;
+        vcmd_engine_off.confirmation = 0;
+        vcmd_engine_off.from_external = false;
 
-    px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
-	px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, enable);
+        orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
+    }else {
+        mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+        vehicle_command_s vcmd_engine_off = {};
+        vcmd_engine_off.timestamp = hrt_absolute_time();
+        vcmd_engine_off.command = 27601;
+        vcmd_engine_off.param1 = 2;
+        vcmd_engine_off.target_component = 0;
+        vcmd_engine_off.target_system = 0;
+        vcmd_engine_off.source_system = 1;
+        vcmd_engine_off.source_component = 1;
+        vcmd_engine_off.confirmation = 0;
+        vcmd_engine_off.from_external = false;
+
+        orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
+    }
 }
 
 void FixedwingPositionControl::set_mode(float base_mode, float main_mode, float custom_mode){

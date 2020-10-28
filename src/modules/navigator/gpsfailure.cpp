@@ -128,8 +128,20 @@ GpsFailure::on_active()
 
 	case GPSF_STATE_TERMINATE:
 	{
-		px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
-		px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
+		mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+		vehicle_command_s vcmd_engine_off = {};
+		vcmd_engine_off.timestamp = hrt_absolute_time();
+		vcmd_engine_off.command = 27601;
+		vcmd_engine_off.param1 = 2;
+		vcmd_engine_off.target_component = 0;
+		vcmd_engine_off.target_system = 0;
+		vcmd_engine_off.source_system = 1;
+		vcmd_engine_off.source_component = 1;
+		vcmd_engine_off.confirmation = 0;
+		vcmd_engine_off.from_external = false;
+
+		orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
+
 		px4_usleep(2*1000000);
 
 		vehicle_attitude_setpoint_s att_sp = {};
