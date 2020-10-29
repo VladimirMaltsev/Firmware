@@ -94,3 +94,18 @@ PARAM_DEFINE_FLOAT(NAV_GPSF_P, 0.0f);
  * @group GPS Failure Navigation
  */
 PARAM_DEFINE_FLOAT(NAV_GPSF_TR, 0.0f);
+
+/**
+ * value for target altitude when gps failsafe
+ *
+ * Set to gps failsafe altitude
+ *
+ * @unit m
+ * @min 0.0
+ * @max 1000.0
+ * @decimal 1
+ * @increment 0.5
+ * @group GPS Failure Navigation
+ */
+PARAM_DEFINE_FLOAT(NAV_GPSF_ALT, 500.f);
+
