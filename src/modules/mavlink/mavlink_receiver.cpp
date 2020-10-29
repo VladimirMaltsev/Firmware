@@ -582,9 +582,14 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			//-SET-MODE-END-----------------------------
 
 			px4_sleep(2);
+			float pwm_parachute_release = 0.f;
+			float pwm_buffer_release = 0.f;
+			param_get(param_find("PWM_PRCHT_REL"), &pwm_parachute_release);
+			param_get(param_find("PWM_BUFFER_REL"), &pwm_buffer_release);
 
-			act1.control[5] = -0.97f;
-			act1.control[6] = 0.2f;
+			act1.control[5] = (pwm_parachute_release - 1000.f) / 1000.f - 1.f; // -0.97f; //parachute release
+			act1.control[6] = (pwm_buffer_release - 1000.f) / 1000.f; // 0.2f; //buffer release
+
 			act1.timestamp = hrt_absolute_time();
 			if (act_pub1 != nullptr) {
 				orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -611,8 +616,12 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		}
 		case MAV_PARACHUTE_DO_DROP:
 		{
-			act1.control[7] = 1.0f;
-			act1.control[6] = 0.0f;
+			float pwm_parachute_drop = 0.f;
+			float pwm_buffer_drop = 0.f;
+			param_get(param_find("PWM_PRCHT_DROP"), &pwm_parachute_drop);
+			param_get(param_find("PWM_BUFFER_DROP"), &pwm_buffer_drop);
+			act1.control[7] = (pwm_parachute_drop - 1000.f) / 1000.f; // 1.0f; //parachute drop;
+    			act1.control[6] = (pwm_buffer_drop - 1000.f) / 1000.f; // 0.0f; //buffer drop
 			act1.timestamp = hrt_absolute_time();
 			if (act_pub1 != nullptr)
 				orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);

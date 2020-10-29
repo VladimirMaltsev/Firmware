@@ -105,6 +105,12 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.heightrate_p = param_find("FW_T_HRATE_P");
     _parameter_handles.heightrate_ff = param_find("FW_T_HRATE_FF");
     _parameter_handles.speedrate_p = param_find("FW_T_SRATE_P");
+    _parameter_handles.pwm_parachute_release = param_find("PWM_PRCHT_REL");
+    _parameter_handles.pwm_parachute_drop = param_find("PWM_PRCHT_DROP");
+    _parameter_handles.pwm_parachute_close = param_find("PWM_PRCHT_CLOSE");
+    _parameter_handles.pwm_buffer_drop = param_find("PWM_BUFFER_DROP");
+    _parameter_handles.pwm_buffer_release = param_find("PWM_BUFFER_REL");
+    _parameter_handles.fw_min_clmb_pitch = param_find("FW_MIN_CLMB_PTCH");
 
     // if vehicle is vtol these handles will be set when we get the vehicle status
     _parameter_handles.airspeed_trans = PARAM_INVALID;
@@ -159,6 +165,12 @@ FixedwingPositionControl::parameters_update() {
     param_get(_parameter_handles.land_airspeed_scale, &(_parameters.land_airspeed_scale));
     param_get(_parameter_handles.land_throtTC_scale, &(_parameters.land_throtTC_scale));
     param_get(_parameter_handles.loiter_radius, &(_parameters.loiter_radius));
+    param_get(_parameter_handles.pwm_parachute_release, &(_parameters.pwm_parachute_release));
+    param_get(_parameter_handles.pwm_parachute_drop, &(_parameters.pwm_parachute_drop));
+    param_get(_parameter_handles.pwm_parachute_close, &(_parameters.pwm_parachute_close));
+    param_get(_parameter_handles.pwm_buffer_drop, &(_parameters.pwm_buffer_drop));
+    param_get(_parameter_handles.pwm_buffer_release, &(_parameters.pwm_buffer_release));
+    param_get(_parameter_handles.fw_min_clmb_pitch, &(_parameters.fw_min_clmb_pitch));
 
     // VTOL parameter VTOL_TYPE
     if (_parameter_handles.vtol_type != PARAM_INVALID) {
@@ -1552,7 +1564,7 @@ FixedwingPositionControl::play_tune(uint8_t id){
 
 void
 FixedwingPositionControl::release_buffer(){
-    act1.control[6] = 0.2f; //buffer drop
+    act1.control[6] = (_parameters.pwm_buffer_release - 1000.f) / 1000.f; // 0.2f; //buffer drop
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -1564,7 +1576,7 @@ FixedwingPositionControl::release_buffer(){
 
 void
 FixedwingPositionControl::release_parachute(){
-    act1.control[5] = -0.97f; //parachute release
+    act1.control[5] = (_parameters.pwm_parachute_release - 1000.f) / 1000.f - 1.f; // -0.97f; //parachute release
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -1576,7 +1588,7 @@ FixedwingPositionControl::release_parachute(){
 
 void
 FixedwingPositionControl::close_parachute(){
-    act1.control[5] = 0.f; //parachute release
+    act1.control[5] = (_parameters.pwm_parachute_close - 1000.f) / 1000.f - 1.f; // 0.0 //close parachute
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -1588,8 +1600,8 @@ FixedwingPositionControl::close_parachute(){
 
 void
 FixedwingPositionControl::drop_parachute(){
-    act1.control[7] = 1.0f;
-    act1.control[6] = 0.0f;
+    act1.control[7] = (_parameters.pwm_parachute_drop - 1000.f) / 1000.f; // 1.0f; //parachute drop;
+    act1.control[6] = (_parameters.pwm_buffer_drop - 1000.f) / 1000.f; // 0.0f; //buffer drop
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);

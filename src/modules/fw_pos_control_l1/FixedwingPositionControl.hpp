@@ -359,6 +359,12 @@ private:
         float land_throtTC_scale;
 
         float loiter_radius;
+        float pwm_parachute_release;
+        float pwm_parachute_drop;
+        float pwm_parachute_close;
+        float pwm_buffer_drop;
+        float pwm_buffer_release;
+        float fw_min_clmb_pitch;
 
         // VTOL
         float airspeed_trans;
@@ -426,6 +432,12 @@ private:
         param_t land_throtTC_scale;
 
         param_t loiter_radius;
+        param_t pwm_parachute_release;
+        param_t pwm_parachute_drop;
+        param_t pwm_parachute_close;
+        param_t pwm_buffer_drop;
+        param_t pwm_buffer_release;
+        param_t fw_min_clmb_pitch;
 
         param_t vtol_type;
     } _parameter_handles {};				///< handles for interesting parameters */
