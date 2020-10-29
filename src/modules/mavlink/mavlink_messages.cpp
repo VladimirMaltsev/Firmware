@@ -4920,6 +4920,7 @@ private:
     MavlinkOrbSubscription *_sub_adc_report;
     uint64_t _stg_status_time{0};
     uint64_t _adc_report_time{0};
+    uint8_t fuel_level{100};
 
     /* do not allow top copying this class */
     MavlinkStreamStgStatus(MavlinkStreamStgStatus &) = delete;
@@ -4965,6 +4966,12 @@ protected:
 			}
 		}
 		_msg_stg_status.engine_temperature = temp;
+
+		float raw_fuel_level = (_adc_report.channel_value[11] - 0.976f) / 0.244f;
+		if (fuel_level > (uint8_t)raw_fuel_level) {
+			fuel_level--;
+		}
+		_msg_stg_status.fuel_level = fuel_level;
 
 		mavlink_msg_stg_status_send_struct(_mavlink->get_channel(), &_msg_stg_status);
 
