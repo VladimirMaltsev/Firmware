@@ -807,16 +807,3 @@ PARAM_DEFINE_FLOAT(PWM_BUFFER_DROP, 1000.f);
  */
 PARAM_DEFINE_FLOAT(FW_MIN_CLMB_PTCH, 10.f);
 
-/**
- * value for target altitude when gps failsafe
- *
- * Set to gps failsafe altitude
- *
- * @unit m
- * @min 0.0
- * @max 1000.0
- * @decimal 1
- * @increment 0.5
- * @group FW L1 Control
- */
-PARAM_DEFINE_FLOAT(FW_GPSF_ALT, 500.f);

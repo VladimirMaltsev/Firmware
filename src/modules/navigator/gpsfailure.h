@@ -64,7 +64,7 @@ private:
 		(ParamFloat<px4::params::NAV_GPSF_R>) _param_nav_gpsf_r,
 		(ParamFloat<px4::params::NAV_GPSF_P>) _param_nav_gpsf_p,
 		(ParamFloat<px4::params::NAV_GPSF_TR>) _param_nav_gpsf_tr,
-		(ParamFloat<px4::params::FW_GPSF_ALT>) _param_fw_gpsf_alt
+		(ParamFloat<px4::params::NAV_GPSF_ALT>) _param_nav_gpsf_alt
 	)
 
 	enum GPSFState {
@@ -79,8 +79,6 @@ private:
 	orb_advert_t	_att_sp_pub{nullptr};
 	uORB::Subscription<vehicle_air_data_s>	_sub_airdata;
 	float _gpsf_altitude{0.f};
-	float _gpsf_diff_alt{0.f};
-
 	/**
 	 * Set the GPSF item
 	 */
