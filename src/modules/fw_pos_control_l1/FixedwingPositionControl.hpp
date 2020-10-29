@@ -305,6 +305,8 @@ private:
     float _asp_after_transition{0.0f};
     bool _was_in_transition{false};
 
+    bool bano_enabled{false};
+
     // estimator reset counters
     uint8_t _pos_reset_counter{0};				///< captures the number of times the estimator has reset the horizontal position
     uint8_t _alt_reset_counter{0};				///< captures the number of times the estimator has reset the altitude state
@@ -453,6 +455,7 @@ private:
 
     void                engine_enable(bool enable);
     void                starter_enable(bool enable);
+    void                bano_enable(bool enable);
 
     void                set_mode(float base_mode = 29, float main_mode = 2, float custom_mode = 0);
     void                set_arm(bool enable);

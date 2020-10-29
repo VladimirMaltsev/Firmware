@@ -1398,6 +1398,22 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     return setpoint;
 }
 
+void
+FixedwingPositionControl::bano_enable(bool enable){
+        vehicle_command_s vcmd_engine_off = {};
+        vcmd_engine_off.timestamp = hrt_absolute_time();
+        vcmd_engine_off.command = 27605;
+        vcmd_engine_off.param1 = enable ? 1 : 0;
+        vcmd_engine_off.target_component = 0;
+        vcmd_engine_off.target_system = 0;
+        vcmd_engine_off.source_system = 1;
+        vcmd_engine_off.source_component = 1;
+        vcmd_engine_off.confirmation = 0;
+        vcmd_engine_off.from_external = false;
+
+        orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
+}
+
 void FixedwingPositionControl::engine_enable(bool enable){
 
     if (enable){
@@ -1614,6 +1630,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         _launchDetector.reset();
         _launch_detection_state = LAUNCHDETECTION_RES_NONE;
         _launch_detection_notify = 0;
+
+        if (bano_enabled){
+            bano_enabled = false;
+            bano_enable(false);
+        }
     }
 
 
@@ -1628,6 +1649,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             Eulerf euler(Quatf(_att.q));
             get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
             _takeoff_ground_alt = _global_pos.alt;
+
+            if (!bano_enabled) {
+                bano_enable(true);
+                bano_enabled = true;
+            }
 
             /* Inform user that launchdetection is running every 4s */
             if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
