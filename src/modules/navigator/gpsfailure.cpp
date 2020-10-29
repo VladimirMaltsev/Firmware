@@ -92,9 +92,9 @@ GpsFailure::on_active()
 			// get baro altitude
 			_sub_airdata.update();
 			const float baro_altitude_amsl = _sub_airdata.get().baro_alt_meter;
-			if (baro_altitude_amsl - _gps_failed_altitude < 500.f) {
+			if (baro_altitude_amsl - _gpsf_altitude < _gpsf_diff_alt) {
 				att_sp.pitch_body = math::radians(_param_nav_gpsf_p.get());
-			} else if (baro_altitude_amsl - _gps_failed_altitude > 550.f){
+			} else if (baro_altitude_amsl - _gpsf_altitude > (_gpsf_diff_alt + 50.f)){
 				att_sp.pitch_body = math::radians(-5.f);
 			} else
 				att_sp.pitch_body = 0.f;
@@ -149,7 +149,15 @@ GpsFailure::on_active()
 		orb_advertise(ORB_ID(vehicle_attitude_setpoint), &att_sp);
 
 		struct actuator_controls_s act1 = {};
-		act1.control[5] = -0.97f; //parachute release
+
+		float pwm_parachute_release = 0.f;
+		float pwm_buffer_release = 0.f;
+		param_get(param_find("PWM_PRCHT_REL"), &pwm_parachute_release);
+		param_get(param_find("PWM_BUFFER_REL"), &pwm_buffer_release);
+
+		act1.control[5] = (pwm_parachute_release - 1000.f) / 1000.f - 1.f; // -0.97f; //parachute release
+		act1.control[6] = (pwm_buffer_release - 1000.f) / 1000.f; // 0.2f; //buffer release
+
 		act1.timestamp = hrt_absolute_time();
 		orb_advertise(ORB_ID(actuator_controls_1), &act1);
 
@@ -235,8 +243,9 @@ GpsFailure::advance_gpsf()
 
 		// get baro altitude
 		_sub_airdata.update();
-		_gps_failed_altitude = _sub_airdata.get().baro_alt_meter;
+		_gpsf_altitude = _sub_airdata.get().baro_alt_meter;
 
+		param_get(param_find("FW_GPSF_ALT"), &_gpsf_diff_alt);
 		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Global position failure: fixed bank loiter");
 		break;
 

@@ -1564,7 +1564,7 @@ FixedwingPositionControl::play_tune(uint8_t id){
 
 void
 FixedwingPositionControl::release_buffer(){
-    act1.control[6] = (_parameters.pwm_buffer_release - 1000.f) / 1000.f; // 0.2f; //buffer drop
+    act1.control[6] = (_parameters.pwm_buffer_release - 1000.f) / 1000.f; // 0.2f; //buffer release
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
@@ -1719,7 +1719,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             /* enforce a minimum of 8 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(8.0f),
+                                        radians(_parameters.fw_min_clmb_pitch),
                                         radians(takeoff_pitch_max_deg),
                                         _parameters.throttle_min,
                                         takeoff_throttle,
