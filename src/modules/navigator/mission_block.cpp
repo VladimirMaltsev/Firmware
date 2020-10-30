@@ -246,7 +246,8 @@ MissionBlock::is_mission_item_reached()
 			 * Therefore the item is marked as reached once the system reaches the loiter
 			 * radius (+ some margin). Time inside and turn count is handled elsewhere.
 			 */
-			if (dist >= 0.0f && dist <= _navigator->get_acceptance_radius(fabsf(_mission_item.loiter_radius) * 1.2f)
+
+			if (dist >= 0.0f && dist <= _navigator->get_loiter_radius() * 1.2f
 			    && dist_z <= _navigator->get_altitude_acceptance_radius()) {
 
 				_waypoint_position_reached = true;
@@ -429,7 +430,9 @@ MissionBlock::is_mission_item_reached()
 			     _mission_item.nav_cmd == NAV_CMD_LOITER_TO_ALT)) {
 
 				float bearing = get_bearing_to_next_waypoint(curr_sp.lat, curr_sp.lon, next_sp.lat, next_sp.lon);
-				float inner_angle = M_PI_2_F - asinf(_mission_item.loiter_radius / range);
+				// We should not use asinf outside of [-1..1].
+				const float ratio = math::constrain(_mission_item.loiter_radius / range, -1.0f, 1.0f);
+				float inner_angle = M_PI_2_F - asinf(ratio);
 
 				// Compute "ideal" tangent origin
 				if (curr_sp.loiter_direction > 0) {
