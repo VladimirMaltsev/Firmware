@@ -4967,10 +4967,11 @@ protected:
 		}
 		_msg_stg_status.engine_temperature = temp;
 
-		float raw_fuel_level = (_adc_report.channel_value[11] - 0.976f) / 0.244f;
-		if (fuel_level > (uint8_t)raw_fuel_level) {
-			fuel_level--;
-		}
+		float raw_fuel_level = (_adc_report.channel_value[4]*2.f - 0.976f) / 0.244f;
+		// if (fuel_level > (uint8_t)raw_fuel_level) {
+		// 	fuel_level--;
+		// }
+		fuel_level = raw_fuel_level * 100;
 		_msg_stg_status.fuel_level = fuel_level;
 
 		mavlink_msg_stg_status_send_struct(_mavlink->get_channel(), &_msg_stg_status);
@@ -5051,19 +5052,19 @@ protected:
 
 		for (int i = 0; i < 12; i ++){
 			_msg_adc_report.channel_id[i] = _adc_report.channel_id[i];
-			_msg_adc_report.channel_value[i] = _adc_report.channel_value[i];
+			_msg_adc_report.channel_value[i] = _adc_report.channel_value[i] * 2.0f;
 		}
 
-		float tempVolt = _adc_report.channel_value[10];
-		int temp = 190;
-		for (; temp >= 0; temp--) {
-			if (tempVolt < NTC_temp[temp]){
-				temp -= 40;
-				break;
-			}
-		}
-		//mavlink_log_info(&_mavlink_log_pub, "adc sended");
-		_msg_adc_report.channel_value[10] = temp;
+		// float tempVolt = _adc_report.channel_value[10];
+		// int temp = 190;
+		// for (; temp >= 0; temp--) {
+		// 	if (tempVolt < NTC_temp[temp]){
+		// 		temp -= 40;
+		// 		break;
+		// 	}
+		// }
+		// //mavlink_log_info(&_mavlink_log_pub, "adc sended");
+		// _msg_adc_report.channel_value[10] = temp;
 		mavlink_msg_adc_report_send_struct(_mavlink->get_channel(), &_msg_adc_report);
 	}
 
