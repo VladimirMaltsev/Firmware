@@ -1309,9 +1309,13 @@ Mission::altitude_sp_foh_update()
 		 * radius around the current waypoint
 		 **/
 		float delta_alt = (get_absolute_altitude_for_item(_mission_item) - pos_sp_triplet->previous.alt);
-		float grad = -delta_alt / (_distance_current_previous - acc_rad);
-		float a = pos_sp_triplet->previous.alt - grad * _distance_current_previous;
-		pos_sp_triplet->current.alt = a + grad * _min_current_sp_distance_xy;
+		if (fabs(delta_alt) > 50.f){
+			pos_sp_triplet->current.alt = pos_sp_triplet->previous.alt;
+		} else {
+			float grad = -delta_alt / (_distance_current_previous - acc_rad);
+			float a = pos_sp_triplet->previous.alt - grad * _distance_current_previous;
+			pos_sp_triplet->current.alt = a + grad * _min_current_sp_distance_xy;
+		}
 	}
 
 	// we set altitude directly so we can run this in parallel to the heading update
