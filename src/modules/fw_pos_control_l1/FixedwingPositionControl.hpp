@@ -244,6 +244,7 @@ private:
     hrt_abstime _control_position_last_called{0};		///< last call of control_position  */
     hrt_abstime _manual_mode_last_updated{0};
     bool _manual_mode_enabled{false};
+    bool fixed_takeoff_line{false};
 
     /* Landing */
     bool _land_noreturn_horizontal{false};
