@@ -77,7 +77,8 @@
         "git.detectSubmodulesLimit": 20,
         "files.associations": {
                 "*.jinja": "jinja",
-                "cmath": "cpp"
+                "cmath": "cpp",
+                "*.tcc": "cpp"
         },
         "search.exclude": {
                 "build/**": true

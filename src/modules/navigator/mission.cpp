@@ -576,6 +576,8 @@ Mission::set_mission_items()
 {
 	/* reset the altitude foh (first order hold) logic, if altitude foh is enabled (param) a new foh element starts now */
 	_min_current_sp_distance_xy = FLT_MAX;
+	_curr_checked = false;
+	_needing_loiter = false;
 
 	/* the home dist check provides user feedback, so we initialize it to this */
 	bool user_feedback_done = false;
@@ -1299,19 +1301,24 @@ Mission::altitude_sp_foh_update()
 
 	/* if the minimal distance is smaller then the acceptance radius, we should be at waypoint alt
 	 * navigator will soon switch to the next waypoint item (if there is one) as soon as we reach this altitude */
-	if (_min_current_sp_distance_xy < acc_rad) {
-		pos_sp_triplet->current.alt = get_absolute_altitude_for_item(_mission_item);
+	float delta_alt = (get_absolute_altitude_for_item(_mission_item) - pos_sp_triplet->previous.alt);
+	if (fabs(delta_alt) > _navigator->get_altitude_acceptance_radius()){
+		acc_rad = _navigator->get_loiter_radius() / 2.f;
+		pos_sp_triplet->current.alt = pos_sp_triplet->previous.alt;
 
+		if (_min_current_sp_distance_xy < acc_rad) {
+			pos_sp_triplet->current.alt = get_absolute_altitude_for_item(_mission_item);
+		}
 	} else {
-		/* update the altitude sp of the 'current' item in the sp triplet, but do not update the altitude sp
-		 * of the mission item as it is used to check if the mission item is reached
-		 * The setpoint is set linearly and such that the system reaches the current altitude at the acceptance
-		 * radius around the current waypoint
-		 **/
-		float delta_alt = (get_absolute_altitude_for_item(_mission_item) - pos_sp_triplet->previous.alt);
-		if (fabs(delta_alt) > 50.f){
-			pos_sp_triplet->current.alt = pos_sp_triplet->previous.alt;
+		if (_min_current_sp_distance_xy < acc_rad) {
+			pos_sp_triplet->current.alt = get_absolute_altitude_for_item(_mission_item);
 		} else {
+			/* update the altitude sp of the 'current' item in the sp triplet, but do not update the altitude sp
+			* of the mission item as it is used to check if the mission item is reached
+			* The setpoint is set linearly and such that the system reaches the current altitude at the acceptance
+			* radius around the current waypoint
+			**/
+
 			float grad = -delta_alt / (_distance_current_previous - acc_rad);
 			float a = pos_sp_triplet->previous.alt - grad * _distance_current_previous;
 			pos_sp_triplet->current.alt = a + grad * _min_current_sp_distance_xy;
