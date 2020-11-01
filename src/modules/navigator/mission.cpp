@@ -1303,7 +1303,7 @@ Mission::altitude_sp_foh_update()
 	 * navigator will soon switch to the next waypoint item (if there is one) as soon as we reach this altitude */
 	float delta_alt = (get_absolute_altitude_for_item(_mission_item) - pos_sp_triplet->previous.alt);
 	if (fabs(delta_alt) > _navigator->get_altitude_acceptance_radius()){
-		acc_rad = _navigator->get_loiter_radius() / 2.f;
+		acc_rad = _navigator->get_loiter_radius();
 		pos_sp_triplet->current.alt = pos_sp_triplet->previous.alt;
 
 		if (_min_current_sp_distance_xy < acc_rad) {
