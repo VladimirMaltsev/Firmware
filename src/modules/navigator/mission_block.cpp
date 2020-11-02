@@ -162,7 +162,7 @@ MissionBlock::is_mission_item_reached()
 
 					struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
 
-					mavlink_log_critical(&_mavlink_log_pub, "dist=%f dist_xy=%f", dist, dist_xy);
+					//mavlink_log_critical(&_mavlink_log_pub, "dist=%f dist_xy=%f", dist, dist_xy);
 					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp->lat, curr_sp->lon);
 					float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp->lat, curr_sp->lon, next_sp->lat, next_sp->lon);
 
@@ -179,7 +179,7 @@ MissionBlock::is_mission_item_reached()
 			}
 
 			if (dist_xy < _navigator->get_loiter_radius()/2.f && _needing_loiter && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
-				mavlink_log_critical(&_mavlink_log_pub, "dist = rad/2, switch to loiter");
+				mavlink_log_critical(&_mavlink_log_pub, "switch to loiter");
 				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 				curr_sp->loiter_radius = _navigator->get_loiter_radius();
 				curr_sp->loiter_direction = _loiter_direction;
@@ -337,7 +337,7 @@ MissionBlock::is_mission_item_reached()
 					_waypoint_position_reached = true;
 				}
 			} else if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION && !_needing_loiter && dist_xy >= 0.0f && dist_xy <= mission_acceptance_radius) {
-				mavlink_log_critical(&_mavlink_log_pub, "rad = %f", mission_acceptance_radius);
+				mavlink_log_critical(&_mavlink_log_pub, "acc_rad = %f", mission_acceptance_radius);
 				_waypoint_position_reached = true;
 			} else if (!_needing_loiter && dist_xy >= 0.0f && dist_xy <= _navigator->get_loiter_radius() / 2.f) {
 				_waypoint_position_reached = true;
