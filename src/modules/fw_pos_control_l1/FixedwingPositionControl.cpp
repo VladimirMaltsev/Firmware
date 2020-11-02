@@ -112,6 +112,9 @@ FixedwingPositionControl::FixedwingPositionControl() :
     _parameter_handles.pwm_buffer_release = param_find("PWM_BUFFER_REL");
     _parameter_handles.fw_min_clmb_pitch = param_find("FW_MIN_CLMB_PTCH");
 
+    _parameter_handles.fuel_level_min = param_find("FUEL_LVL_MIN");
+    _parameter_handles.fuel_level_max = param_find("FUEL_LVL_MAX");
+
     // if vehicle is vtol these handles will be set when we get the vehicle status
     _parameter_handles.airspeed_trans = PARAM_INVALID;
     _parameter_handles.vtol_type = PARAM_INVALID;
@@ -171,6 +174,9 @@ FixedwingPositionControl::parameters_update() {
     param_get(_parameter_handles.pwm_buffer_drop, &(_parameters.pwm_buffer_drop));
     param_get(_parameter_handles.pwm_buffer_release, &(_parameters.pwm_buffer_release));
     param_get(_parameter_handles.fw_min_clmb_pitch, &(_parameters.fw_min_clmb_pitch));
+
+    param_get(_parameter_handles.fuel_level_max, &(_parameters.fuel_level_max));
+    param_get(_parameter_handles.fuel_level_min, &(_parameters.fuel_level_min));
 
     // VTOL parameter VTOL_TYPE
     if (_parameter_handles.vtol_type != PARAM_INVALID) {

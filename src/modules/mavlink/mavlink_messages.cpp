@@ -4967,11 +4967,18 @@ protected:
 		}
 		_msg_stg_status.engine_temperature = temp;
 
-		float raw_fuel_level = (_adc_report.channel_value[4]*2.f - 0.976f) / 0.244f;
+		float fuel_level_max;
+		float fuel_level_min;
+		param_get(param_find("FUEL_LVL_MAX"), &fuel_level_max);
+		param_get(param_find("FUEL_LVL_MIN"), &fuel_level_min);
+
+		float raw_fuel_level = (_adc_report.channel_value[4]*2.f - fuel_level_min) / (fuel_level_max - fuel_level_min);
 		// if (fuel_level > (uint8_t)raw_fuel_level) {
 		// 	fuel_level--;
 		// }
 		fuel_level = raw_fuel_level * 100;
+		if (fuel_level > 100)
+			fuel_level = 0.f;
 		_msg_stg_status.fuel_level = fuel_level;
 
 		mavlink_msg_stg_status_send_struct(_mavlink->get_channel(), &_msg_stg_status);

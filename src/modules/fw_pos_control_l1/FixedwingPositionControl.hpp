@@ -367,6 +367,9 @@ private:
         float pwm_buffer_release;
         float fw_min_clmb_pitch;
 
+        float fuel_level_min;
+        float fuel_level_max;
+
         // VTOL
         float airspeed_trans;
         int32_t vtol_type;
@@ -439,6 +442,8 @@ private:
         param_t pwm_buffer_drop;
         param_t pwm_buffer_release;
         param_t fw_min_clmb_pitch;
+        param_t fuel_level_min;
+        param_t fuel_level_max;
 
         param_t vtol_type;
     } _parameter_handles {};				///< handles for interesting parameters */

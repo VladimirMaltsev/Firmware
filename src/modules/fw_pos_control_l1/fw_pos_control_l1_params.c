@@ -806,3 +806,31 @@ PARAM_DEFINE_FLOAT(PWM_BUFFER_DROP, 1000.f);
  * @group FW L1 Control
  */
 PARAM_DEFINE_FLOAT(FW_MIN_CLMB_PTCH, 10.f);
+
+/**
+ * value for min fuel level
+ *
+ * Set to min climbout pitch to prevent falling
+ *
+ * @unit deg
+ * @min 0.0
+ * @max 30.0
+ * @decimal 1
+ * @increment 0.5
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FUEL_LVL_MIN, 1.f);
+
+/**
+ * value for max fuel level
+ *
+ * Set to min climbout pitch to prevent falling
+ *
+ * @unit deg
+ * @min 0.0
+ * @max 30.0
+ * @decimal 1
+ * @increment 0.5
+ * @group FW L1 Control
+ */
+PARAM_DEFINE_FLOAT(FUEL_LVL_MAX, 3.f);
