@@ -306,6 +306,7 @@ private:
     bool _was_in_transition{false};
 
     bool bano_enabled{false};
+    bool fixed_takeoff_line{false};
 
     // estimator reset counters
     uint8_t _pos_reset_counter{0};				///< captures the number of times the estimator has reset the horizontal position
