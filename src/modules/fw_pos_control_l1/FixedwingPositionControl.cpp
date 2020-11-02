@@ -368,7 +368,7 @@ FixedwingPositionControl::engine_status_poll() {
             starter_enable(true);
 
         } else if (_ess.eng_st == engine_status_s::ENGINE_OPENING_PARACHUTE || _ess.eng_st == engine_status_s::ENGINE_CLOSING_PARACHUTE){
-            if (!_control_mode.flag_armed && _vehicle_land_detected.landed) {
+            if (!_control_mode.flag_armed && _vehicle_land_detected.landed && (_roll < -1.5f || _roll > 1.5f)) {
                 if (!checking_parachute) {
                     release_parachute();
                     checking_parachute = true;
@@ -939,7 +939,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _tecs.reset_state();
     }
 
-    if (_manual_mode_enabled) {
+    if (_manual_mode_enabled && !is_landing) {
         if (hrt_elapsed_time(&_manual_mode_last_updated) > 30e6) {
             //mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
             _launch_detection_notify = hrt_absolute_time();
@@ -1798,9 +1798,8 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         if (!parachute_released){
             release_parachute();
             release_buffer();
+            parachute_released = true;
         }
-        parachute_released = true;
-
     }
     if (parachute_released){
         throttle_land = 0.f;
