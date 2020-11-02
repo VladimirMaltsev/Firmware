@@ -132,10 +132,10 @@ protected:
 	hrt_abstime _action_start{0};
 	hrt_abstime _time_wp_reached{0};
 
-	bool checked{false};
+	bool _curr_checked{false};
 	bool _needing_loiter{false};
-	int8_t loiter_direction{1};
-	float loiter_threshold{0.17f};
+	int8_t _loiter_direction{1};
+	float _loiter_threshold{0.0f};
 
 	orb_advert_t	_mavlink_log_pub{nullptr};
 	orb_advert_t    _actuator_pub{nullptr};
