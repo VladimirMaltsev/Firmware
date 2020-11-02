@@ -1588,6 +1588,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
     // continuously reset launch detection and runway takeoff until armed
     if (!_control_mode.flag_armed) {
+         fixed_takeoff_line = false;
         ready_to_fly = false;
         _launchDetector.reset();
         _launch_detection_state = LAUNCHDETECTION_RES_NONE;
@@ -1602,10 +1603,14 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
 
-            // create virtual waypoint in 500m ahead before takeoff
-            Eulerf euler(Quatf(_att.q));
-            get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
-            _takeoff_ground_alt = _global_pos.alt;
+             if (!fixed_takeoff_line) {
+                fixed_takeoff_line = true;
+                // create virtual waypoint in 500m ahead before takeoff
+                Eulerf euler(Quatf(_att.q));
+                get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+                _takeoff_ground_alt = _global_pos.alt;
+            }
+
 
             /* Inform user that launchdetection is running every 4s */
             if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
