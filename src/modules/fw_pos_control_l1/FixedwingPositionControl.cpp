@@ -927,7 +927,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _tecs.reset_state();
     }
 
-    if (_manual_mode_enabled) {
+    if (_manual_mode_enabled && !is_landing) {
         if (hrt_elapsed_time(&_manual_mode_last_updated) > 30e6) {
             //mavlink_log_critical(&_mavlink_log_pub, "No updating manual control 30s, switching to auto");
             _launch_detection_notify = hrt_absolute_time();
@@ -1569,18 +1569,12 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
     Vector2f curr_wp((float) pos_sp_curr.lat, (float) pos_sp_curr.lon);
     Vector2f prev_wp{0.0f, 0.0f}; /* previous waypoint */
 
-    if (pos_sp_prev.valid) {
-        prev_wp(0) = (float) pos_sp_prev.lat;
-        prev_wp(1) = (float) pos_sp_prev.lon;
-
-    } else {
-        /*
-         * No valid previous waypoint, go for the current wp.
-         * This is automatically handled by the L1 library.
-         */
-        prev_wp(0) = (float) pos_sp_curr.lat;
-        prev_wp(1) = (float) pos_sp_curr.lon;
-    }
+    /*
+    * If no valid previous waypoint, go for the current wp.
+    * This is automatically handled by the L1 library.
+    */
+    prev_wp(0) = pos_sp_prev.valid ? (float) pos_sp_prev.lat : (float) pos_sp_curr.lat;
+    prev_wp(1) = pos_sp_prev.valid ? (float) pos_sp_prev.lon : (float) pos_sp_curr.lon;
 
     // apply flaps for takeoff according to the corresponding scale factor set
     // via FW_FLAPS_TO_SCL
@@ -1588,13 +1582,12 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
     // continuously reset launch detection and runway takeoff until armed
     if (!_control_mode.flag_armed) {
-         fixed_takeoff_line = false;
+        fixed_takeoff_line = false;
         ready_to_fly = false;
         _launchDetector.reset();
         _launch_detection_state = LAUNCHDETECTION_RES_NONE;
         _launch_detection_notify = 0;
     }
-
 
     /* Perform launch detection */
     if (_launchDetector.launchDetectionEnabled() &&
@@ -1610,7 +1603,6 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                 get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
                 _takeoff_ground_alt = _global_pos.alt;
             }
-
 
             /* Inform user that launchdetection is running every 4s */
             if (hrt_elapsed_time(&_launch_detection_notify) > 4e6) {
@@ -1661,10 +1653,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             takeoff_throttle = 1.0f;
 
-            /* enforce a minimum of 8 degrees pitch up on takeoff, or take parameter */
+            /* enforce a minimum of 6 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(8.0f),
+                                        radians(6.0f),
                                         radians(takeoff_pitch_max_deg),
                                         _parameters.throttle_min,
                                         takeoff_throttle,
