@@ -1656,7 +1656,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             /* enforce a minimum of 6 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(6.0f),
+                                        radians(10.0f),
                                         radians(takeoff_pitch_max_deg),
                                         _parameters.throttle_min,
                                         takeoff_throttle,
@@ -1695,7 +1695,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         /* Set default roll and pitch setpoints during detection phase */
         _att_sp.roll_body = 0.0f;
-        _att_sp.pitch_body = max(radians(pos_sp_curr.pitch_min), radians(10.0f));
+        _att_sp.pitch_body = max(radians(pos_sp_curr.pitch_min), radians(20.0f));
     }
 }
 

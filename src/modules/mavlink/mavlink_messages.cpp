@@ -5047,7 +5047,7 @@ protected:
 
 	if (_sub->update_if_changed(&_adc_report)) {
 		orb_advert_t	_mavlink_log_pub{nullptr};
-		mavlink_log_info(&_mavlink_log_pub, "adc updated");
+		//mavlink_log_info(&_mavlink_log_pub, "adc updated");
         // if (_sub->update(&_adc_report_time, &_adc_report)) {
            	 mavlink_adc_report_t _msg_adc_report;
 
@@ -5064,7 +5064,7 @@ protected:
 				break;
 			}
 		}
-		mavlink_log_info(&_mavlink_log_pub, "adc sended");
+		//mavlink_log_info(&_mavlink_log_pub, "adc sended");
 		_msg_adc_report.channel_value[10] = temp;
 		mavlink_msg_adc_report_send_struct(_mavlink->get_channel(), &_msg_adc_report);
 	}
