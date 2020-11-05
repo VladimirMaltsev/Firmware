@@ -1709,7 +1709,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
                                               const position_setpoint_s &pos_sp_prev,
                                               const position_setpoint_s &pos_sp_curr, float wp_distance) {
 
-    const float airspeed_land = _parameters.airspeed_min;
+    const float airspeed_land = (2.f * _parameters.airspeed_min + _parameters.airspeed_trim) / 3.f;
 
     float throttle_land = 0.f;
     float throttle_max = 0.f;
@@ -1726,20 +1726,29 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_min = _parameters.throttle_min;
     } else if (wp_distance > 20.f) {
         _land_motor_lim = true;
+        release_parachute_timer = hrt_absolute_time();
         throttle_land = 0.f;
         throttle_max = 0.f;
         throttle_min = 0.f;
 
         engine_enable(false);
     } else {
-
         if (!parachute_released){
             release_parachute();
             release_buffer();
+            parachute_released = true;
         }
-        parachute_released = true;
-
     }
+
+    if (_land_motor_lim && !parachute_released){
+        if (hrt_elapsed_time(&release_parachute_timer) > 3e6) {
+                mavlink_log_critical(&_mavlink_log_pub, "Landing timer");
+                release_parachute();
+                release_buffer();
+                parachute_released = true;
+            }
+    }
+
     if (parachute_released){
         throttle_land = 0.f;
         throttle_max = 0.f;
