@@ -1311,7 +1311,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         if (!ready_to_fly)
             _att_sp.thrust_body[0] = _parameters.throttle_idle;
         else
-            _att_sp.thrust_body[0] = _parameters.throttle_max;
+            _att_sp.thrust_body[0] = 1.f;
 
     } else if (_control_mode_current == FW_POSCTRL_MODE_AUTO &&
                pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
@@ -1334,7 +1334,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             if (!ready_to_fly)
                 _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
             else {
-                _att_sp.thrust_body[0] = _parameters.throttle_max;
+                _att_sp.thrust_body[0] = 1.f;
             }
         } else {
             _att_sp.thrust_body[0] = min(get_tecs_thrust(), throttle_max);
@@ -1375,7 +1375,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     // auto runway takeoff
     use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_AUTO &&
                         pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
-                        (_launch_detection_state == LAUNCHDETECTION_RES_NONE ||
+                        (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS || _vehicle_land_detected.landed ||
                          _runway_takeoff.runwayTakeoffEnabled()));
 
     // flaring during landing
@@ -1385,6 +1385,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_OTHER);
 
     if (use_tecs_pitch) {
+        //mavlink_log_critical(&_mavlink_log_pub, "use tecs pitch");
         _att_sp.pitch_body = get_tecs_pitch();
     }
 
@@ -1633,10 +1634,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS) {
             takeoff_throttle = _parameters.throttle_idle;
         }
+        _att_sp.pitch_body = _pitch;
 
-        /* select maximum pitch: the launchdetector may impose another limit for the pitch
-            * depending on the state of the launch */
-        const float takeoff_pitch_max_deg = _launchDetector.getPitchMax(_parameters.pitch_limit_max);
         const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
@@ -1656,8 +1655,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             /* enforce a minimum of 6 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(10.0f),
-                                        radians(takeoff_pitch_max_deg),
+                                        radians(10.f),
+                                        radians(_parameters.pitch_limit_max),
                                         _parameters.throttle_min,
                                         takeoff_throttle,
                                         _parameters.throttle_cruise,
@@ -1685,6 +1684,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         false,
                                         radians(_parameters.pitch_limit_min));
         }
+        if (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS) {
+            //mavlink_log_critical(&_mavlink_log_pub, "!= LRDE _pitch = %.3f", _pitch);
+            _att_sp.pitch_body = _pitch;
+        }
+
 
     } else {
         /* Tell the attitude controller to stop integrating while we are waiting
@@ -1694,8 +1698,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         _att_sp.yaw_reset_integral = true;
 
         /* Set default roll and pitch setpoints during detection phase */
-        _att_sp.roll_body = 0.0f;
-        _att_sp.pitch_body = max(radians(pos_sp_curr.pitch_min), radians(20.0f));
+        _att_sp.roll_body = _roll;//0.0f;
+        _att_sp.pitch_body = _pitch;//max(radians(pos_sp_curr.pitch_min), _pitch);
+        //mavlink_log_critical(&_mavlink_log_pub, "Tell the attitude _pitch = %.3f", _pitch);
     }
 }
 
@@ -1936,6 +1941,8 @@ FixedwingPositionControl::run() {
                     _control_mode.flag_control_position_enabled ||
                     _control_mode.flag_control_velocity_enabled ||
                     _control_mode.flag_control_acceleration_enabled) {
+
+                    //mavlink_log_critical(&_mavlink_log_pub, "true alt = %.3f", _att_sp.pitch_body);
 
                     /* lazily publish the setpoint only once available */
                     if (_attitude_sp_pub != nullptr) {
