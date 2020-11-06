@@ -1635,6 +1635,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             takeoff_throttle = _parameters.throttle_idle;
         }
         _att_sp.pitch_body = _pitch;
+        if (_pitch < radians(10.f)){
+            _att_sp.pitch_body = radians(10.f);
+        }
 
         const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
