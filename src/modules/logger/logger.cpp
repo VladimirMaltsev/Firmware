@@ -1169,7 +1169,7 @@ void Logger::run()
 				camera_capture_s cam_cap;
 				orb_copy(ORB_ID(camera_capture), camera_sub, &cam_cap);
 				char message[256];
-				int ret_s = snprintf(message, 256, "%d %.4f %.4f %.4f %.4f %.16f %.16f %llu \n",
+				int ret_s = snprintf(message, 256, "%d %.4f %.4f %.4f %.4f %.8f %.8f %llu \n",
 								cam_cap.seq, cam_cap.q[0], cam_cap.q[1], cam_cap.q[2],
 								cam_cap.alt, cam_cap.lat, cam_cap.lon,cam_cap.timestamp_utc);
 
