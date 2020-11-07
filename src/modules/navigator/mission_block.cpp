@@ -157,7 +157,7 @@ MissionBlock::is_mission_item_reached()
 				//so loiter is needed if
 				//			1. param1 (hold or time_inside) eq
 				//			2. altitude difference > altitude acceptance radius
-				if (prev_sp->valid && (_mission_item.time_inside > 0.5f || fabs(_mission_item.altitude - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){
+				if (prev_sp->valid && (_mission_item.time_inside > 0.5f || fabs(altitude_amsl - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){
 					_needing_loiter = true;
 
 					struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
