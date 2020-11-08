@@ -654,7 +654,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		case MAV_STG_DO_STOP_STARTING:
 		{
 			px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
-			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
+			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, false);
 			mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
 			break;
 		}
