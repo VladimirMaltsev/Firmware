@@ -488,20 +488,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		acknowledge(msg->sysid, msg->compid, cmd_mavlink.command, vehicle_command_ack_s::VEHICLE_RESULT_FAILED);
 		return;
 	}
-	if (cmd_mavlink.command == 60777){
-		engine_status_s ess = {};
-		ess.timestamp = hrt_absolute_time();
-		ess.eng_st = cmd_mavlink.param1;
-
-		orb_advert_t _cmd_eng_st{nullptr};
-
-		if (_cmd_eng_st == nullptr) {
-			_cmd_eng_st = orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
-			orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
-		} else {
-			orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
-		}
-	} else if (cmd_mavlink.command == MAV_CMD_PARACHUTE_ACTION){
+	if (cmd_mavlink.command == MAV_CMD_PARACHUTE_ACTION){
 		switch ((int)cmd_mavlink.param1)
 		{
 		case MAV_PARACHUTE_DO_RELEASE:
@@ -635,23 +622,6 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			break;
 		}
 
-	} else if (cmd_mavlink.command == MAV_CMD_SWITCH_REMOTE_OVERRIDE_MODE){
-		if(cmd_mavlink.param1 == 0 ){ //remote controller
-			int ATCcommand = 5 ;
-			param_set (param_find ("NAV_RCL_ACT"), &ATCcommand) ;
-
-			input_rc_s input_rc = {};
-			orb_advertise(ORB_ID(input_rc), &input_rc) ;
-
-			remoteMode = true ;
-			_mavlink->send_statustext_critical("remote_control_mode");
-		} else if (cmd_mavlink.param1 == 1){ //channels override
-			input_rc_s input_rc = {};
-			orb_advertise (ORB_ID(input_rc) , &input_rc);
-
-			remoteMode = false;
-			_mavlink->send_statustext_critical("channels_override_mode");
-		}
 	} else if (cmd_mavlink.command == MAV_CMD_DO_ENGINE_ACTION){
 
 		px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
@@ -664,18 +634,52 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		}
 
 	} else if (cmd_mavlink.command == MAV_CMD_STG_ACTION){
-		//_mavlink->send_statustext_critical("send STG_ACTION");
-		vehicle_command_s vcmd_stg = vehicle_command;
-		vcmd_stg.from_external = false;
-		if (vehicle_command.param1 == 1) {
+		switch ((int)cmd_mavlink.param1)
+		{
+		case MAV_STG_DO_START:
+		{
 			px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
 			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
 			mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
+
+			vehicle_command_s vcmd_stg = vehicle_command;
+			vcmd_stg.from_external = false;
+
+			if (_cmd_pub == nullptr)
+				_cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
+			else
+				orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
+			break;
 		}
-		if (_cmd_pub == nullptr)
-			_cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_stg, vehicle_command_s::ORB_QUEUE_LENGTH);
-		else
-			orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vcmd_stg);
+		case MAV_STG_DO_STOP_STARTING:
+		{
+			px4_arch_configgpio(GPIO_GPIO4_OUTPUT);
+			px4_arch_gpiowrite(GPIO_GPIO4_OUTPUT, true);
+			mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+			break;
+		}
+		case MAV_STG_DO_IDLE_THROTTLE:
+		{
+			engine_status_s ess = {};
+			ess.timestamp = hrt_absolute_time();
+			ess.eng_st = 1;
+
+			orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
+			break;
+		}
+		case MAV_STG_DO_FULL_THROTTLE:
+		case MAV_STG_DO_TAKEOFF_THROTTLE:
+		{
+			engine_status_s ess = {};
+			ess.timestamp = hrt_absolute_time();
+			ess.eng_st = 2;
+
+			orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
+			break;
+		}
+		default:
+			break;
+		}
 
 	} else if (cmd_mavlink.command == MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES) {
 		/* send autopilot version message */
