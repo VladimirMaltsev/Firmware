@@ -4917,7 +4917,9 @@ public:
 
 private:
     MavlinkOrbSubscription *_sub;
+    MavlinkOrbSubscription *_sub_adc_report;
     uint64_t _stg_status_time{0};
+    uint64_t _adc_report_time{0};
 
     /* do not allow top copying this class */
     MavlinkStreamStgStatusNew(MavlinkStreamStgStatusNew &) = delete;
@@ -4926,44 +4928,59 @@ private:
 protected:
     explicit MavlinkStreamStgStatusNew(Mavlink *mavlink) : MavlinkStream(mavlink),
         _sub(_mavlink->add_orb_subscription(ORB_ID(stg_status))),  // make sure you enter the name of your uORB topic here
-        _stg_status_time(0)
+        _stg_status_time(0),
+	_adc_report_time(0)
     {}
 
     bool send(const hrt_abstime t)
     {
 
         struct stg_status_s _stg_status = {};    //make sure stg_status_struct_s is the definition of your uORB topic
+	struct adc_report_s _adc_report = {};
 
         if (_sub->update(&_stg_status_time, &_stg_status)) {
+
+		_sub_adc_report->update(&_adc_report_time, &_adc_report);
            	 mavlink_stg_status_new_t _msg_stg_status;  //make sure mavlink_stg_status_t is the definition of your custom MAVLink message
 
-			_msg_stg_status.voltage_battery = _stg_status.voltage_battery;
-			_msg_stg_status.voltage_generator = _stg_status.voltage_generator;
-			_msg_stg_status.current_battery = _stg_status.current_battery;
-			_msg_stg_status.power_load = _stg_status.power_load;
-			_msg_stg_status.current_charge =  _stg_status.current_charge;
-			_msg_stg_status.bridge_temperature = _stg_status.temperarture_bridge;
-			_msg_stg_status.rpm_cranckshaft = _stg_status.rpm_cranckshaft;
-			_msg_stg_status.uptime = _stg_status.uptime;
-			_msg_stg_status.motor_state = _stg_status.motor_state;
-			_msg_stg_status.stg_errors_bitmask = _stg_status.stg_errors_bitmask;
+		_msg_stg_status.voltage_battery = _stg_status.voltage_battery;
+		_msg_stg_status.voltage_generator = _stg_status.voltage_generator;
+		_msg_stg_status.current_battery = _stg_status.current_battery;
+		_msg_stg_status.power_load = _stg_status.power_load;
+		_msg_stg_status.current_charge =  _stg_status.current_charge;
+		_msg_stg_status.bridge_temperature = _stg_status.temperarture_bridge;
+		_msg_stg_status.rpm_cranckshaft = _stg_status.rpm_cranckshaft;
+		_msg_stg_status.uptime = _stg_status.uptime;
+		_msg_stg_status.motor_state = _stg_status.motor_state;
+		_msg_stg_status.stg_errors_bitmask = _stg_status.stg_errors_bitmask;
 
-			mavlink_msg_stg_status_new_send_struct(_mavlink->get_channel(), &_msg_stg_status);
-
-			if (_stg_status.rpm_cranckshaft < 100){
-				engine_status_s ess = {};
-				ess.timestamp = hrt_absolute_time();
-				ess.eng_st = 8;
-
-				orb_advert_t _cmd_eng_st{nullptr};
-
-				if (_cmd_eng_st == nullptr) {
-					_cmd_eng_st = orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
-					orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
-				} else {
-					orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
-				}
+		float tempVolt = _adc_report.channel_value[10];
+		int temp = 190;
+		for (; temp >= 0; temp--) {
+			if (tempVolt < NTC_temp[temp]){
+				temp += 10;
+				break;
 			}
+		}
+		_msg_stg_status.engine_temperature = temp;
+		_msg_stg_status.fuel_level = 42;
+
+		mavlink_msg_stg_status_new_send_struct(_mavlink->get_channel(), &_msg_stg_status);
+
+		if (_stg_status.rpm_cranckshaft < 100){
+			engine_status_s ess = {};
+			ess.timestamp = hrt_absolute_time();
+			ess.eng_st = 8;
+
+			orb_advert_t _cmd_eng_st{nullptr};
+
+			if (_cmd_eng_st == nullptr) {
+				_cmd_eng_st = orb_advertise_queue(ORB_ID(engine_status), &ess, 3);
+				orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
+			} else {
+				orb_publish(ORB_ID(engine_status), _cmd_eng_st, &ess);
+			}
+		}
 
 			// /* battery status message with higher resolution */
 			// mavlink_battery_status_t bat_msg = {};
