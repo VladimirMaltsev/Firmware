@@ -3057,8 +3057,8 @@ MavlinkReceiver::receive_start(pthread_t *thread, Mavlink *parent)
 void
 MavlinkReceiver::handle_message_stg_status_msg(mavlink_message_t *msg)
 {
-	mavlink_stg_status_t status;
-	mavlink_msg_stg_status_decode(msg, &status);
+	mavlink_stg_status_new_t status;
+	mavlink_msg_stg_status_new_decode(msg, &status);
 
 	struct stg_status_s f;
 	memset(&f, 0, sizeof(f));

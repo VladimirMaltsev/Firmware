@@ -4896,7 +4896,7 @@ public:
     }
     static const char *get_name_static()
     {
-	    return "STG_STATUS";
+	    return "STG_STATUS_NEW";
     }
     static uint16_t get_id_static()
     {
@@ -4944,7 +4944,7 @@ protected:
 
 		_sub_adc_report->update(&_adc_report_time, &_adc_report);
 
-           	mavlink_stg_status_t _msg_stg_status;  //make sure mavlink_stg_status_t is the definition of your custom MAVLink message
+           	mavlink_stg_status_new_t _msg_stg_status;  //make sure mavlink_stg_status_t is the definition of your custom MAVLink message
 
 		_msg_stg_status.voltage_battery = _stg_status.voltage_battery;
 		_msg_stg_status.voltage_generator = _stg_status.voltage_generator;
@@ -4981,7 +4981,7 @@ protected:
 			fuel_level = 0.f;
 		_msg_stg_status.fuel_level = fuel_level;
 
-		mavlink_msg_stg_status_send_struct(_mavlink->get_channel(), &_msg_stg_status);
+		mavlink_msg_stg_status_new_send_struct(_mavlink->get_channel(), &_msg_stg_status);
 
 		if (_stg_status.rpm_cranckshaft < 100){
 			engine_status_s ess = {};
