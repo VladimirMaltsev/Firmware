@@ -643,6 +643,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
 
 			vehicle_command_s vcmd_stg = vehicle_command;
+			vcmd_stg.command = 20001;
 			vcmd_stg.from_external = false;
 
 			if (_cmd_pub == nullptr)
