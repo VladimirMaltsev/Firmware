@@ -128,13 +128,17 @@ void pwm_limit_calc(const bool armed, const bool pre_armed, const unsigned num_c
 	/* then set effective_pwm based on state */
 	switch (local_limit_state) {
 	case PWM_LIMIT_STATE_OFF:
+		for (unsigned i = 0; i < (num_channels < 5 ? num_channels : 5); i++) {
+			effective_pwm[i] = disarmed_pwm[i];
+		}
+
+		break;
 	case PWM_LIMIT_STATE_INIT:
 		for (unsigned i = 0; i < num_channels; i++) {
 			effective_pwm[i] = disarmed_pwm[i];
 		}
 
 		break;
-
 	case PWM_LIMIT_STATE_RAMP: {
 			hrt_abstime diff = hrt_elapsed_time(&limit->time_armed);
 
