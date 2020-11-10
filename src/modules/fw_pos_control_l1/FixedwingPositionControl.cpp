@@ -1393,7 +1393,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     // auto runway takeoff
     use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_AUTO &&
                         pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
-                        (_launch_detection_state == LAUNCHDETECTION_RES_NONE ||
+                        (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS || _vehicle_land_detected.landed ||
                          _runway_takeoff.runwayTakeoffEnabled()));
 
     // flaring during landing
@@ -1706,6 +1706,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS) {
             takeoff_throttle = _parameters.throttle_idle;
         }
+        _att_sp.pitch_body = _pitch;
+        if (_pitch < radians(10.f)){
+            _att_sp.pitch_body = radians(10.f);
+        }
 
         /* select maximum pitch: the launchdetector may impose another limit for the pitch
             * depending on the state of the launch */
@@ -1758,6 +1762,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         false,
                                         radians(_parameters.pitch_limit_min));
         }
+        if (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS) {
+            //mavlink_log_critical(&_mavlink_log_pub, "!= LRDE _pitch = %.3f", _pitch);
+            _att_sp.pitch_body = _pitch;
+        }
 
     } else {
         /* Tell the attitude controller to stop integrating while we are waiting
@@ -1767,8 +1775,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         _att_sp.yaw_reset_integral = true;
 
         /* Set default roll and pitch setpoints during detection phase */
-        _att_sp.roll_body = 0.0f;
-        _att_sp.pitch_body = max(radians(pos_sp_curr.pitch_min), radians(10.0f));
+        _att_sp.roll_body = _roll;//0.0f;
+        _att_sp.pitch_body = _pitch;//max(radians(pos_sp_curr.pitch_min), _pitch);
     }
 }
 
