@@ -179,6 +179,7 @@ public:
         float dangerous_dist_to_takeoff_alt{0.f};
         hrt_abstime dang_alt_time_det{0};
         hrt_abstime unexp_desc_time{0};
+        hrt_abstime release_parachute_timer{0};
 
 private:
     orb_advert_t	_mavlink_log_pub{nullptr};
