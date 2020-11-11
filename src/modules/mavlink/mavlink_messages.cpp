@@ -4887,12 +4887,12 @@ protected:
 	}
 };
 
-class MavlinkStreamStgStatus : public MavlinkStream
+class MavlinkStreamStgStatusNew : public MavlinkStream
 {
 public:
     const char *get_name() const
     {
-	    return MavlinkStreamStgStatus::get_name_static();
+	    return MavlinkStreamStgStatusNew::get_name_static();
     }
     static const char *get_name_static()
     {
@@ -4900,7 +4900,7 @@ public:
     }
     static uint16_t get_id_static()
     {
-	    return MAVLINK_MSG_ID_STG_STATUS;
+	    return MAVLINK_MSG_ID_STG_STATUS_NEW;
     }
     uint16_t get_id()
     {
@@ -4908,11 +4908,11 @@ public:
     }
     static MavlinkStream *new_instance(Mavlink *mavlink)
     {
-        return new MavlinkStreamStgStatus(mavlink);
+        return new MavlinkStreamStgStatusNew(mavlink);
     }
     unsigned get_size()
     {
-        return MAVLINK_MSG_ID_STG_STATUS_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+        return MAVLINK_MSG_ID_STG_STATUS_NEW_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
     }
 
 private:
@@ -4923,11 +4923,11 @@ private:
     uint8_t fuel_level{100};
 
     /* do not allow top copying this class */
-    MavlinkStreamStgStatus(MavlinkStreamStgStatus &) = delete;
-    MavlinkStreamStgStatus& operator = (const MavlinkStreamStgStatus &) = delete;
+    MavlinkStreamStgStatusNew(MavlinkStreamStgStatusNew &) = delete;
+    MavlinkStreamStgStatusNew& operator = (const MavlinkStreamStgStatusNew &) = delete;
 
 protected:
-    explicit MavlinkStreamStgStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
+    explicit MavlinkStreamStgStatusNew(Mavlink *mavlink) : MavlinkStream(mavlink),
         _sub(_mavlink->add_orb_subscription(ORB_ID(stg_status))),  // make sure you enter the name of your uORB topic here
         _sub_adc_report(_mavlink->add_orb_subscription(ORB_ID(adc_report))),
 	_stg_status_time(0),
@@ -5137,7 +5137,7 @@ static const StreamListItem streams_list[] = {
 	StreamListItem(&MavlinkStreamGroundTruth::new_instance, &MavlinkStreamGroundTruth::get_name_static, &MavlinkStreamGroundTruth::get_id_static),
 	StreamListItem(&MavlinkStreamPing::new_instance, &MavlinkStreamPing::get_name_static, &MavlinkStreamPing::get_id_static),
 	StreamListItem(&MavlinkStreamOrbitStatus::new_instance, &MavlinkStreamOrbitStatus::get_name_static, &MavlinkStreamOrbitStatus::get_id_static),
-	StreamListItem(&MavlinkStreamStgStatus::new_instance, &MavlinkStreamStgStatus::get_name_static, &MavlinkStreamStgStatus::get_id_static),
+	StreamListItem(&MavlinkStreamStgStatusNew::new_instance, &MavlinkStreamStgStatusNew::get_name_static, &MavlinkStreamStgStatusNew::get_id_static),
 	StreamListItem(&MavlinkStreamAdcReport::new_instance, &MavlinkStreamAdcReport::get_name_static, &MavlinkStreamAdcReport::get_id_static)
 };
 
