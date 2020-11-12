@@ -75,6 +75,7 @@ private:
 
 
 	DEFINE_PARAMETERS(
+		(ParamInt<px4::params::TAIL_NUMBER>) _param_tail_number,   /**< example parameter */
 		(ParamInt<px4::params::SYS_AUTOSTART>) _param_sys_autostart,   /**< example parameter */
 		(ParamInt<px4::params::SYS_AUTOCONFIG>) _param_sys_autoconfig  /**< another parameter */
 	)
