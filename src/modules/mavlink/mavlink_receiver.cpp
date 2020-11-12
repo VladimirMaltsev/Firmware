@@ -335,6 +335,7 @@ MavlinkReceiver::evaluate_target_ok(int command, int target_system, int target_c
 		break;
 	case MAV_CMD_REQUEST_MESSAGE:
 	case MAV_CMD_PARACHUTE_ACTION:
+	case MAV_CMD_STG_ACTION:
 		target_ok = true;
 		break;
 	case MAV_CMD_DO_DIGICAM_CONTROL:
