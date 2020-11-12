@@ -4982,8 +4982,8 @@ protected:
 			fuel_level = 100;
 		if (fuel_level < 2.5f)
 			fuel_level = 0;
-		orb_advert_t	_mavlink_log_pub{nullptr};
-		mavlink_log_critical(&_mavlink_log_pub, "recieved stg .. %d", _stg_status.uptime);
+		// orb_advert_t	_mavlink_log_pub{nullptr};
+		// mavlink_log_critical(&_mavlink_log_pub, "recieved stg .. %d", _stg_status.uptime);
 		_msg_stg_status.fuel_level = fuel_level;
 
 		mavlink_msg_stg_status_new_send_struct(_mavlink->get_channel(), &_msg_stg_status);
