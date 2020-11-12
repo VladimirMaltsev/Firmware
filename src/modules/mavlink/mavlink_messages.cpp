@@ -4941,7 +4941,7 @@ protected:
         struct stg_status_s _stg_status = {};    //make sure stg_status_struct_s is the definition of your uORB topic
 	struct adc_report_s _adc_report = {};
 
-        if (_sub->update(&_stg_status_time, &_stg_status) || _sub_adc_report->update(&_adc_report_time, &_adc_report)) {
+        if (_sub->update(&_stg_status_time, &_stg_status)) {
 
 		_sub_adc_report->update(&_adc_report_time, &_adc_report);
 
@@ -4982,8 +4982,8 @@ protected:
 			fuel_level = 100;
 		if (fuel_level < 2.5f)
 			fuel_level = 0;
-		//orb_advert_t	_mavlink_log_pub{nullptr};
-		//mavlink_log_critical(&_mavlink_log_pub, "r6=%.2f raw4=%.2f, level=%d", flp, raw_fuel_level * 40.f, fuel_level);
+		orb_advert_t	_mavlink_log_pub{nullptr};
+		mavlink_log_critical(&_mavlink_log_pub, "recieved stg .. %d", _stg_status.uptime);
 		_msg_stg_status.fuel_level = fuel_level;
 
 		mavlink_msg_stg_status_new_send_struct(_mavlink->get_channel(), &_msg_stg_status);
