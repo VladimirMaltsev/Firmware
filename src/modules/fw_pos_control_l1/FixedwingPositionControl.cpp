@@ -374,6 +374,7 @@ FixedwingPositionControl::engine_status_poll() {
             starter_enable(true);
 
         } else if (_ess.eng_st == engine_status_s::ENGINE_OPENING_PARACHUTE || _ess.eng_st == engine_status_s::ENGINE_CLOSING_PARACHUTE){
+            //mavlink_log_critical(&_mavlink_log_pub, "checking conditions");
             if (!_control_mode.flag_armed && _vehicle_land_detected.landed && (_roll < -1.5f || _roll > 1.5f)) {
                 if (!checking_parachute) {
                     release_parachute();

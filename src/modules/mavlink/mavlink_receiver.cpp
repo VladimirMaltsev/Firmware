@@ -132,7 +132,7 @@ void
 MavlinkReceiver::handle_message(mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
-	case MAVLINK_MSG_ID_STG_STATUS:
+	case MAVLINK_MSG_ID_STG_STATUS_NEW:
 		handle_message_battery_status(msg);
 		handle_message_stg_status_msg(msg);
 		break;
@@ -334,6 +334,7 @@ MavlinkReceiver::evaluate_target_ok(int command, int target_system, int target_c
 		target_ok = (target_system == 0) || (target_system == mavlink_system.sysid);
 		break;
 	case MAV_CMD_REQUEST_MESSAGE:
+	case MAV_CMD_PARACHUTE_ACTION:
 		target_ok = true;
 		break;
 	case MAV_CMD_DO_DIGICAM_CONTROL:
@@ -488,7 +489,22 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		acknowledge(msg->sysid, msg->compid, cmd_mavlink.command, vehicle_command_ack_s::VEHICLE_RESULT_FAILED);
 		return;
 	}
-	if (cmd_mavlink.command == MAV_CMD_PARACHUTE_ACTION){
+	if (cmd_mavlink.command == MAV_CMD_BANO_ON_OFF){
+		vehicle_command_s vcmd_engine_off = {};
+		vcmd_engine_off.timestamp = hrt_absolute_time();
+		vcmd_engine_off.command = 27605;
+		vcmd_engine_off.param1 = 1;
+		vcmd_engine_off.target_component = 0;
+		vcmd_engine_off.target_system = 0;
+		vcmd_engine_off.source_system = 1;
+		vcmd_engine_off.source_component = 1;
+		vcmd_engine_off.confirmation = 0;
+		vcmd_engine_off.from_external = false;
+
+		orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
+
+	} else if (cmd_mavlink.command == MAV_CMD_PARACHUTE_ACTION){
+		//mavlink_log_critical(&_mavlink_log_pub, "parach act c1=%.4f", cmd_mavlink.param1);
 		switch ((int)cmd_mavlink.param1)
 		{
 		case MAV_PARACHUTE_DO_RELEASE:
@@ -599,7 +615,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
 
 			px4_sleep(2);
-			float thr_100 = 1.f;
+			float thr_100 = 0.8f;
 			param_set(param_find("FW_THR_MIN"), &idle_thr);
 			param_set(param_find("FW_THR_MAX"), &thr_100);
 
@@ -641,6 +657,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		}
 		case MAV_PARACHUTE_DO_RESERVED:
 		{
+			//mavlink_log_critical(&_mavlink_log_pub, "Do service parachute opening");
 			engine_status_s ess = {};
 			ess.timestamp = hrt_absolute_time();
 			ess.eng_st = engine_status_s::ENGINE_OPENING_PARACHUTE;
