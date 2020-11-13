@@ -1731,10 +1731,16 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             takeoff_throttle = 1.0f;
 
+            float min_pitch = _att_sp.pitch_body;
+
+            if (hrt_elapsed_time(&_time_went_in_air) > 1e6) {
+                min_pitch = radians(_parameters.fw_min_clmb_pitch);
+            }
+
             /* enforce a minimum of 8 degrees pitch up on takeoff, or take parameter */
             tecs_update_pitch_throttle(pos_sp_curr.alt,
                                         _parameters.airspeed_trim,
-                                        radians(_parameters.fw_min_clmb_pitch),
+                                        min_pitch,
                                         radians(takeoff_pitch_max_deg),
                                         _parameters.throttle_min,
                                         takeoff_throttle,
