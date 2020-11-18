@@ -1367,10 +1367,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             if (!ready_to_fly)
                 _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
             else {
-                _att_sp.thrust_body[0] = _parameters.throttle_max;
+                _att_sp.thrust_body[0] = 1.f;
             }
         } else {
-            _att_sp.thrust_body[0] = min(get_tecs_thrust(), throttle_max);
+            _att_sp.thrust_body[0] = get_tecs_thrust();
         }
     }
 
