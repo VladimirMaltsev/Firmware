@@ -1390,7 +1390,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _att_sp.thrust_body[0] = 0.f;
         is_landing = true;
         engine_enable(false);
-        if (hrt_elapsed_time(&unexp_desc_time) > 0.5e6) {
+        if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
             release_parachute();
             release_buffer();
 
