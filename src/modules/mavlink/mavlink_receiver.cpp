@@ -522,7 +522,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			param_set(param_find("FW_ARSP_MODE"), &disable_airspeed);
 			param_set(param_find("FW_THR_MAX"), &idle_thr);
 
-			px4_sleep(2);
+			px4_sleep(1);
 
 			float zero_thr = 0.f;
 			param_set(param_find("FW_THR_MIN"), &zero_thr);
@@ -598,7 +598,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 
 			//-SET-MODE-END-----------------------------
 
-			px4_sleep(2);
+			px4_sleep(1);
 			float pwm_parachute_release = 0.f;
 			float pwm_buffer_release = 0.f;
 			param_get(param_find("PWM_PRCHT_REL"), &pwm_parachute_release);

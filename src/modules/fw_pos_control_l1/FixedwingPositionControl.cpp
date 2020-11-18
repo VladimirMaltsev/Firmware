@@ -497,6 +497,20 @@ FixedwingPositionControl::vehicle_attitude_poll() {
         _R_nb = _R_nb * R_offset;
     }
 
+    float max_roll_deg = 60.f;
+    float max_pitch_deg = 60.f;
+
+    param_get(param_find("FD_FAIL_P"), &max_pitch_deg);
+    param_get(param_find("FD_FAIL_R"), &max_roll_deg);
+
+    const float max_roll(fabsf(math::radians(max_roll_deg)));
+    const float max_pitch(fabsf(math::radians(max_pitch_deg)));
+
+    if (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch))){
+        unexpected_descent = true;
+    }
+
+
     Eulerf euler_angles(_R_nb);
     _roll = euler_angles(0);
     _pitch = euler_angles(1);
@@ -1376,7 +1390,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _att_sp.thrust_body[0] = 0.f;
         is_landing = true;
         engine_enable(false);
-        if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
+        if (hrt_elapsed_time(&unexp_desc_time) > 0.5e6) {
             release_parachute();
             release_buffer();
 
@@ -1539,12 +1553,12 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
             dang_alt_time_det = hrt_absolute_time();
         }
     } else {
-        if (hrt_elapsed_time(&dang_alt_time_det) > 3e6) {
+        if (hrt_elapsed_time(&dang_alt_time_det) > 2e6) {
             float diff = pos_sp_curr.alt - _global_pos.alt;
             float curr_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
             //if vertical speed > 8 m/s or > 3 m/s and engine off
-            if ((((diff - dangerous_diff) > 25) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)) ||
-                (((diff - dangerous_diff) > 9) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 9) && enable_engine_restart)){
+            if ((((diff - dangerous_diff) > 16) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 16)) ||
+                (((diff - dangerous_diff) > 6) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 6) && enable_engine_restart)){
                 //detected an unexpected descent
                 unexpected_descent = true;
                 unexp_desc_time = hrt_absolute_time();
