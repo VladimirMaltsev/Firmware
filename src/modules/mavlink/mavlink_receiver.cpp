@@ -3093,6 +3093,37 @@ MavlinkReceiver::handle_message_stg_status_msg(mavlink_message_t *msg)
 	f.motor_state = status.motor_state;
 	f.stg_errors_bitmask = status.stg_errors_bitmask;
 
+	struct adc_report_s _adc_report = {};
+	orb_copy(ORB_ID(adc_report), _adc_report_sub, &_adc_report);
+
+	float tempVolt = _adc_report.channel_value[10];
+	int temp = 190;
+	for (; temp >= 0; temp--) {
+		if (tempVolt < NTC_temp[temp]){
+			temp -= 40;
+			break;
+		}
+	}
+	f.engine_temperature = temp;
+
+	float fuel_level_max;
+	float fuel_level_min;
+	param_get(param_find("FUEL_LVL_MAX"), &fuel_level_max);
+	param_get(param_find("FUEL_LVL_MIN"), &fuel_level_min);
+
+	float raw_fuel_level = (_adc_report.channel_value[4]*2.f - fuel_level_min) / (fuel_level_max - fuel_level_min);
+	if (raw_fuel_level < 0)
+		raw_fuel_level = 0.f;
+	float flp = fuel_level * 0.6f;
+	fuel_level = flp + raw_fuel_level * 40.f + 1.f;
+	if (fuel_level > 99.1f)
+		fuel_level = 100;
+	if (fuel_level < 2.5f)
+		fuel_level = 0;
+	// orb_advert_t	_mavlink_log_pub{nullptr};
+	// mavlink_log_critical(&_mavlink_log_pub, "recieved stg .. %d", _stg_status.uptime);
+	f.fuel_level = fuel_level;
+
 
 	if (_stg_status_msg_pub == nullptr) {
 		_stg_status_msg_pub = orb_advertise(ORB_ID(stg_status), &f);
