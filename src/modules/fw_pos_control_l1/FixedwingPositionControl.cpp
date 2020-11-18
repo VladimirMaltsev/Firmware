@@ -1678,6 +1678,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
+            float thr_100 = 0.8f;
+			param_set(param_find("FW_THR_MAX"), &thr_100);
+			int enable_airspeed = 0;
+			param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 
             if (!fixed_takeoff_line) {
                 fixed_takeoff_line = true;
