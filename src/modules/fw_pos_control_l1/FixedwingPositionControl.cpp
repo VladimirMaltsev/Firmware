@@ -506,7 +506,7 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     const float max_roll(fabsf(math::radians(max_roll_deg)));
     const float max_pitch(fabsf(math::radians(max_pitch_deg)));
 
-    if (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch))){
+    if (_control_mode.flag_armed && ((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch))){
         unexpected_descent = true;
     }
 
