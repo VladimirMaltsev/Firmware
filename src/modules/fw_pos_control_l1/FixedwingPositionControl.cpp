@@ -478,11 +478,16 @@ FixedwingPositionControl::vehicle_attitude_poll() {
         _R_nb = _R_nb * R_offset;
     }
 
+    Eulerf euler_angles(_R_nb);
+    _roll = euler_angles(0);
+    _pitch = euler_angles(1);
+    _yaw = euler_angles(2);
+
     float max_roll_deg = 60.f;
     float max_pitch_deg = 60.f;
 
-    param_get(param_find("FD_FAIL_P"), &max_pitch_deg);
-    param_get(param_find("FD_FAIL_R"), &max_roll_deg);
+    //param_get(param_find("FD_FAIL_P"), &max_pitch_deg);
+    // param_get(param_find("FD_FAIL_R"), &max_roll_deg);
 
     const float max_roll(fabsf(math::radians(max_roll_deg)));
     const float max_pitch(fabsf(math::radians(max_pitch_deg)));
@@ -490,12 +495,8 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
         unexpected_descent = true;
         unexp_desc_time = hrt_absolute_time();
+        mavlink_log_critical(&_mavlink_log_pub, "HA: p_m=%.3f p=%.3f | r_m=%.3f r = %.3f", max_pitch, _pitch, max_roll, _roll);
     }
-
-    Eulerf euler_angles(_R_nb);
-    _roll = euler_angles(0);
-    _pitch = euler_angles(1);
-    _yaw = euler_angles(2);
 }
 
 void
