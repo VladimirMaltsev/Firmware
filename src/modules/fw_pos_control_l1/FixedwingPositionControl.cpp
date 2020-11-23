@@ -513,6 +513,7 @@ FixedwingPositionControl::vehicle_attitude_poll() {
 
     if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
         unexpected_descent = true;
+        unexp_desc_time = hrt_absolute_time();
         mavlink_log_critical(&_mavlink_log_pub, "HA: p_m=%.3f p=%.3f | r_m=%.3f r = %.3f", max_pitch, _pitch, max_roll, _roll);
     }
 }
