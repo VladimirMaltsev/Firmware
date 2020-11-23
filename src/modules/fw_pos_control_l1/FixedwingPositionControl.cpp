@@ -478,6 +478,20 @@ FixedwingPositionControl::vehicle_attitude_poll() {
         _R_nb = _R_nb * R_offset;
     }
 
+    float max_roll_deg = 60.f;
+    float max_pitch_deg = 60.f;
+
+    param_get(param_find("FD_FAIL_P"), &max_pitch_deg);
+    param_get(param_find("FD_FAIL_R"), &max_roll_deg);
+
+    const float max_roll(fabsf(math::radians(max_roll_deg)));
+    const float max_pitch(fabsf(math::radians(max_pitch_deg)));
+
+    if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
+        unexpected_descent = true;
+        unexp_desc_time = hrt_absolute_time();
+    }
+
     Eulerf euler_angles(_R_nb);
     _roll = euler_angles(0);
     _pitch = euler_angles(1);
@@ -1337,7 +1351,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                 _att_sp.thrust_body[0] = 1.f;
             }
         } else {
-            _att_sp.thrust_body[0] = min(get_tecs_thrust(), throttle_max);
+            _att_sp.thrust_body[0] = get_tecs_thrust();
         }
     }
 
@@ -1357,7 +1371,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _att_sp.thrust_body[0] = 0.f;
         is_landing = true;
         engine_enable(false);
-        if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
+        if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
             release_parachute();
             release_buffer();
 
@@ -1483,16 +1497,16 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
             dang_alt_time_det = hrt_absolute_time();
         }
     } else {
-        if (hrt_elapsed_time(&dang_alt_time_det) > 3e6) {
+        if (hrt_elapsed_time(&dang_alt_time_det) > 2e6) {
             float diff = pos_sp_curr.alt - _global_pos.alt;
             float curr_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
             //if vertical speed > 8 m/s or > 3 m/s and engine off
-            if ((((diff - dangerous_diff) > 25) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)) ||
-                (((diff - dangerous_diff) > 9) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 9) && enable_engine_restart)){
+            if ((((diff - dangerous_diff) > 16) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 16)) ||
+                (((diff - dangerous_diff) > 6) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 6) && enable_engine_restart)){
                 //detected an unexpected descent
                 unexpected_descent = true;
                 unexp_desc_time = hrt_absolute_time();
-                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / 3.f);
+                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / 2.f);
             } else
             {
                 check_unexp_desc = false;
@@ -1596,6 +1610,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
+
+            float thr_80 = 0.8f;
+			param_set(param_find("FW_THR_MAX"), &thr_80);
+			int enable_airspeed = 0;
+			param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 
              if (!fixed_takeoff_line) {
                 fixed_takeoff_line = true;
