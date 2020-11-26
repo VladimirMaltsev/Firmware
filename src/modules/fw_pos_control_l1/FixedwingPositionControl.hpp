@@ -173,10 +173,13 @@ public:
         float radius{200};
 
     //unexpected descent detector
+        bool detecting_pr_failsafe{false};
         bool unexpected_descent{false};
         bool check_unexp_desc{false};
         float dangerous_diff{0.f};
         float dangerous_dist_to_takeoff_alt{0.f};
+
+        hrt_abstime pr_time_fsafe{0};
         hrt_abstime dang_alt_time_det{0};
         hrt_abstime unexp_desc_time{0};
         hrt_abstime release_parachute_timer{0};
