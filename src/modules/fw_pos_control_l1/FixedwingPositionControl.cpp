@@ -1660,18 +1660,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
     Vector2f curr_wp((float) pos_sp_curr.lat, (float) pos_sp_curr.lon);
     Vector2f prev_wp{0.0f, 0.0f}; /* previous waypoint */
 
-    if (pos_sp_prev.valid) {
-        prev_wp(0) = (float) pos_sp_prev.lat;
-        prev_wp(1) = (float) pos_sp_prev.lon;
-
-    } else {
-        /*
-         * No valid previous waypoint, go for the current wp.
-         * This is automatically handled by the L1 library.
-         */
-        prev_wp(0) = (float) pos_sp_curr.lat;
-        prev_wp(1) = (float) pos_sp_curr.lon;
-    }
+    prev_wp(0) = pos_sp_prev.valid ? (float) pos_sp_prev.lat : (float) pos_sp_curr.lat;
+    prev_wp(1) = pos_sp_prev.valid ? (float) pos_sp_prev.lon : (float) pos_sp_curr.lon;
 
     // apply flaps for takeoff according to the corresponding scale factor set
     // via FW_FLAPS_TO_SCL
@@ -1691,13 +1681,14 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         }
     }
 
-
     /* Perform launch detection */
-    if (_launchDetector.launchDetectionEnabled() &&
-        _launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS) {
+    if (_launchDetector.launchDetectionEnabled() && _launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS) {
 
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
+
+            //sometimes code block in mavlink_reciever.cpp corresponding to parachute release do not complete.
+            //TODO write module for parachute control to solve this issue
             float thr_100 = 0.8f;
 			param_set(param_find("FW_THR_MAX"), &thr_100);
 			int enable_airspeed = 0;
@@ -1756,7 +1747,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         const float takeoff_pitch_max_deg = _launchDetector.getPitchMax(_parameters.pitch_limit_max);
         const float altitude_diff = _global_pos.alt - _takeoff_ground_alt;
 
-        /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
+        /* apply minimum pitch, limit roll, max_thr = 100% if target altitude is not within climbout_diff meters */
         if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
 
             Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
@@ -1769,9 +1760,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             _att_sp.yaw_body = _l1_control.nav_bearing();
 
             takeoff_throttle = 1.0f;
-
             float min_pitch = _att_sp.pitch_body;
 
+            //hold elevators in middle position for good deployed from catapult
             if (hrt_elapsed_time(&_time_went_in_air) > 1e6) {
                 min_pitch = radians(_parameters.fw_min_clmb_pitch);
             }
