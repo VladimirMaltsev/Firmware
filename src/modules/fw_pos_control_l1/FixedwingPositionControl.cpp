@@ -502,9 +502,11 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     _pitch = euler_angles(1);
     _yaw = euler_angles(2);
 
+    //check for dangerous situation with pitch and roll
     float max_roll_deg = 60.f;
     float max_pitch_deg = 60.f;
 
+    //they didn`t want to boot
     //param_get(param_find("FD_FAIL_P"), &max_pitch_deg);
     // param_get(param_find("FD_FAIL_R"), &max_roll_deg);
 
@@ -512,9 +514,26 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     const float max_pitch(fabsf(math::radians(max_pitch_deg)));
 
     if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
-        unexpected_descent = true;
-        unexp_desc_time = hrt_absolute_time();
         mavlink_log_critical(&_mavlink_log_pub, "HA: p_m=%.3f p=%.3f | r_m=%.3f r = %.3f", max_pitch, _pitch, max_roll, _roll);
+
+        //if previous unsafe situations occured more than 10s ago then reset timer
+        if (detecting_pr_failsafe && hrt_elapsed_time(&pr_time_fsafe) > 5e6){
+            pr_time_fsafe = 0;
+            detecting_pr_failsafe = false;
+        }
+
+        //if it is a first time unsafe situation occures then begin checking and start timer
+        if (!detecting_pr_failsafe){
+            detecting_pr_failsafe = true;
+            pr_time_fsafe = hrt_absolute_time();
+        }
+
+        //if one second timer alarm then do unexpected descent
+        if (detecting_pr_failsafe && hrt_elapsed_time(&pr_time_fsafe) > 1e6) {
+            detecting_pr_failsafe = false;
+            unexpected_descent = true;
+            unexp_desc_time = hrt_absolute_time();
+        }
     }
 }
 
