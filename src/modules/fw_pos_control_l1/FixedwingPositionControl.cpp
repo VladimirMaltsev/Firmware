@@ -466,7 +466,7 @@ FixedwingPositionControl::stg_status_poll(){
         orb_copy(ORB_ID(stg_status), _stg_status_sub, &_stg_status);
     }
 
-    if (_vehicle_land_detected.landed && hrt_elapsed_time(&last_time_correct_idle_throttle) > 1e6) {
+    if (_vehicle_land_detected.landed && _stg_status.rpm_cranckshaft > 1500 && hrt_elapsed_time(&last_time_correct_idle_throttle) > 1e6) {
         last_time_correct_idle_throttle = hrt_absolute_time();
 
         float idle_thr = _parameters.throttle_idle;
