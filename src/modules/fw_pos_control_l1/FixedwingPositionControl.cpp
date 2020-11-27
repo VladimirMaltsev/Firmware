@@ -478,6 +478,28 @@ FixedwingPositionControl::airspeed_poll() {
 }
 
 void
+FixedwingPositionControl::stg_status_poll(){
+    bool updated;
+    orb_check(_stg_status_sub, &updated);
+    if (updated){
+        orb_copy(ORB_ID(stg_status), _stg_status_sub, &_stg_status);
+    }
+
+    if (_vehicle_land_detected.landed && hrt_elapsed_time(&last_time_correct_idle_throttle) > 1e6) {
+        last_time_correct_idle_throttle = hrt_absolute_time();
+
+        float idle_thr = _parameters.throttle_idle;
+        if (_stg_status.rpm_cranckshaft > idle_rpm + 200){
+            idle_thr -= 0.01f;
+        } else if (_stg_status.rpm_cranckshaft < idle_rpm - 100){
+            idle_thr += 0.01f;
+        }
+        idle_thr = constrain(idle_thr, 0.18f, 0.23f);
+        param_set(param_find("FW_THR_IDLE"), &idle_thr);
+    }
+}
+
+void
 FixedwingPositionControl::vehicle_attitude_poll() {
     /* check if there is a new position */
     bool updated;

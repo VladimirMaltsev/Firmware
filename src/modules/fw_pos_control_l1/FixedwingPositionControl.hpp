@@ -85,6 +85,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/engine_status.h>
+#include <uORB/topics/stg_status.h>
 #include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
@@ -192,6 +193,7 @@ private:
     int		_pos_sp_triplet_sub{-1};
     int		_control_mode_sub{-1};			///< control mode subscription */
     int		_vehicle_attitude_sub{-1};		///< vehicle attitude subscription */
+    int         _stg_status_sub{-1};
     int		_vehicle_command_sub{-1};		///< vehicle command subscription */
     int		_vehicle_status_sub{-1};		///< vehicle status subscription */
     int		_vehicle_land_detected_sub{-1};		///< vehicle land detected subscription */
@@ -199,6 +201,9 @@ private:
     int		_manual_control_sub{-1};		///< notification of manual control updates */
     int		_sensor_baro_sub{-1};
     int         _engine_status_sub{-1};
+
+    const int idle_rpm = 3800;
+    hrt_abstime last_time_correct_idle_throttle{0};
 
     orb_advert_t	_attitude_sp_pub{nullptr};		///< attitude setpoint */
     orb_advert_t	_pos_ctrl_status_pub{nullptr};		///< navigation capabilities publication */
@@ -217,6 +222,7 @@ private:
     manual_control_setpoint_s	_manual {};			///< r/c channel data */
     position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items */
     vehicle_attitude_s	_att {};			///< vehicle attitude setpoint */
+    stg_status_s _stg_status{};
     vehicle_attitude_setpoint_s	_att_sp {};			///< vehicle attitude setpoint */
     vehicle_command_s		_vehicle_command {};		///< vehicle commands */
     vehicle_control_mode_s		_control_mode {};		///< control mode */
@@ -462,6 +468,7 @@ private:
     void		manual_control_setpoint_poll();
     void		position_setpoint_triplet_poll();
     void		vehicle_attitude_poll();
+    void                stg_status_poll();
     void		vehicle_command_poll();
     void		vehicle_control_mode_poll();
     void		vehicle_land_detected_poll();
