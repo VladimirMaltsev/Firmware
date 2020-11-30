@@ -1602,9 +1602,10 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
             if ((((diff - dangerous_diff) > 16) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 16)) ||
                 (((diff - dangerous_diff) > 6) && ((dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 6) && enable_engine_restart)){
                 //detected an unexpected descent
+                if (!unexpected_descent)
+                    unexp_desc_time = hrt_absolute_time();
                 unexpected_descent = true;
-                unexp_desc_time = hrt_absolute_time();
-                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / 2.f);
+                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / (float)hrt_elapsed_time(&dang_alt_time_det));
             } else
             {
                 check_unexp_desc = false;
