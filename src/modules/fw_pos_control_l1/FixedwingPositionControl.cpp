@@ -435,8 +435,9 @@ FixedwingPositionControl::airspeed_poll() {
 
             _airspeed = as.indicated_airspeed_m_s;
 
-            if (climbout_completed && (hrt_elapsed_time(&_airspeed_last_valid) > 1_s) && (_airspeed > (_parameters.airspeed_max + 1.f) || _airspeed < (_parameters.airspeed_min - 1.f))){
+            if (climbout_completed && (hrt_elapsed_time(&_airspeed_last_valid) > 1_s) && (_airspeed > (_parameters.airspeed_max + 3.f) || _airspeed < (_parameters.airspeed_min - 3.f))){
                 airspeed_valid = false;
+                mavlink_log_critical(&_mavlink_log_pub, "Invalid airspeed = %.2f", _airspeed);
             }else {
                 _airspeed_last_valid = as.timestamp;
                 airspeed_valid = true;
