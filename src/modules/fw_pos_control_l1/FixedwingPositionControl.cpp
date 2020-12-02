@@ -1864,8 +1864,9 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_max = _parameters.throttle_min;
         throttle_min = _parameters.throttle_min;
     } else if (wp_distance > 20.f) {
+        if (!_land_motor_lim)
+            release_parachute_timer = hrt_absolute_time();
         _land_motor_lim = true;
-        release_parachute_timer = hrt_absolute_time();
         throttle_land = 0.f;
         throttle_max = 0.f;
         throttle_min = 0.f;
