@@ -1715,7 +1715,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             //sometimes code block in mavlink_reciever.cpp corresponding to parachute release do not complete.
             //TODO write module for parachute control to solve this issue
-            float thr_100 = 0.8f;
+            float thr_100 = 0.9f;
 			param_set(param_find("FW_THR_MAX"), &thr_100);
 			int enable_airspeed = 0;
 			param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
@@ -1806,10 +1806,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         tecs_status_s::TECS_MODE_TAKEOFF);
 
             /* limit roll motion to ensure enough lift */
-            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
+            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-15.0f), radians(15.0f));
 
         } else {
-            climbout_completed - true;
+            climbout_completed = true;
 
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
