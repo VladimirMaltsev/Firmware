@@ -1421,9 +1421,14 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             release_parachute();
             release_buffer();
 
-            play_tune(11);
-            set_mode();
-            set_arm(false);
+            if (_vehicle_land_detected.landed) {
+                drop_parachute();
+                parachute_dropped = true;
+
+                play_tune(11);
+                set_mode();
+                set_arm(false);
+            }
         }
     }
 
