@@ -1722,6 +1722,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             if (!fixed_takeoff_line) {
                 fixed_takeoff_line = true;
+                mavlink_log_critical(&_mavlink_log_pub, "Fixed takeoff line");
+
                 // create virtual waypoint in 500m ahead before takeoff
                 Eulerf euler(Quatf(_att.q));
                 get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
