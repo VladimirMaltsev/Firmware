@@ -1727,11 +1727,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             if (!fixed_takeoff_line) {
                 fixed_takeoff_line = true;
-                mavlink_log_critical(&_mavlink_log_pub, "Fixed takeoff line");
-
                 // create virtual waypoint in 500m ahead before takeoff
                 Eulerf euler(Quatf(_att.q));
                 get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+                mavlink_log_critical(&_mavlink_log_pub, "Prev: lat1=%.10f lat2=%.10f", (float) _hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon);
+                mavlink_log_critical(&_mavlink_log_pub, "Curr: lat1=%.10f lat2=%.10f", (float) _hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon);
                 _takeoff_ground_alt = _global_pos.alt;
             }
 
@@ -1786,6 +1786,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
             Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
 
+            // mavlink_log_critical(&_mavlink_log_pub, "t_p: lat=%.10f lon=%.10f", prev_wp_takeoff(0), prev_wp_takeoff(1));
+            // mavlink_log_critical(&_mavlink_log_pub, "t_c: lat=%.10f lon=%.10f", curr_wp_takeoff(0), curr_wp_takeoff(1));
+
             /* populate l1 control setpoint */
             _l1_control.navigate_waypoints(prev_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
 
@@ -1793,7 +1796,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             _att_sp.yaw_body = _l1_control.nav_bearing();
 
             takeoff_throttle = 1.0f;
-            float min_pitch = _att_sp.pitch_body;
+            float min_pitch = _pitch;
 
             //hold elevators in middle position for good deployed from catapult
             if (hrt_elapsed_time(&_time_went_in_air) > 1e6) {
