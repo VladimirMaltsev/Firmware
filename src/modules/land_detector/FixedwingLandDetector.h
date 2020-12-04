@@ -65,6 +65,7 @@ protected:
 	void _update_topics() override;
 
 	bool _get_landed_state() override;
+	bool _get_landed_state_in_flight();
 	float _get_max_altitude() override;
 
 private:

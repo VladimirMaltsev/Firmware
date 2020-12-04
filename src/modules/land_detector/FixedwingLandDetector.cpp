@@ -95,10 +95,14 @@ float FixedwingLandDetector::_get_max_altitude()
 bool FixedwingLandDetector::_get_landed_state()
 {
 	// only trigger flight conditions if we are armed
-	if (!_arming.armed) {
-		return true;
-	}
+	// if (!_arming.armed) {
+	// 	return true;
+	// }
 
+	return _get_landed_state_in_flight();
+}
+
+bool FixedwingLandDetector::_get_landed_state_in_flight(){
 	bool landDetected = false;
 
 	if (hrt_elapsed_time(&_local_pos.timestamp) < 500 * 1000) {
@@ -136,7 +140,6 @@ bool FixedwingLandDetector::_get_landed_state()
 		// Control state topic has timed out and we need to assume we're landed.
 		landDetected = true;
 	}
-
 	return landDetected;
 }
 
