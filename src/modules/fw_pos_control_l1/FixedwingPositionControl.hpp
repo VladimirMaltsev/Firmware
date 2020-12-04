@@ -318,6 +318,9 @@ private:
     bool bano_enabled{false};
     bool fixed_takeoff_line{false};
 
+    Vector2f prev_wp_takeoff{0.f, 0.f};
+    Vector2f curr_wp_takeoff{0.f, 0.f};
+
     // estimator reset counters
     uint8_t _pos_reset_counter{0};				///< captures the number of times the estimator has reset the horizontal position
     uint8_t _alt_reset_counter{0};				///< captures the number of times the estimator has reset the altitude state

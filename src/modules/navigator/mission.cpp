@@ -578,6 +578,7 @@ Mission::set_mission_items()
 	_min_current_sp_distance_xy = FLT_MAX;
 	_curr_checked = false;
 	_needing_loiter = false;
+	_is_reached = false;
 
 	/* the home dist check provides user feedback, so we initialize it to this */
 	bool user_feedback_done = false;
@@ -1306,8 +1307,9 @@ Mission::altitude_sp_foh_update()
 		acc_rad = _navigator->get_loiter_radius();
 		pos_sp_triplet->current.alt = pos_sp_triplet->previous.alt;
 
-		if (_min_current_sp_distance_xy < acc_rad) {
+		if (_is_reached || _min_current_sp_distance_xy < acc_rad) {
 			pos_sp_triplet->current.alt = get_absolute_altitude_for_item(_mission_item);
+			_is_reached = true;
 		}
 	} else {
 		if (_min_current_sp_distance_xy < acc_rad) {

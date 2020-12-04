@@ -1730,6 +1730,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                 // create virtual waypoint in 500m ahead before takeoff
                 Eulerf euler(Quatf(_att.q));
                 get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+                prev_wp_takeoff(0) = (float) _hdg_hold_prev_wp.lat;
+                prev_wp_takeoff(1) = (float) _hdg_hold_prev_wp.lon;
+                curr_wp_takeoff(0) = (float) _hdg_hold_curr_wp.lat;
+                curr_wp_takeoff(1) = (float) _hdg_hold_curr_wp.lon;
                 mavlink_log_critical(&_mavlink_log_pub, "Prev: lat1=%.10f lat2=%.10f", (float) _hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon);
                 mavlink_log_critical(&_mavlink_log_pub, "Curr: lat1=%.10f lat2=%.10f", (float) _hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon);
                 _takeoff_ground_alt = _global_pos.alt;
@@ -1782,9 +1786,6 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         /* apply minimum pitch, limit roll, max_thr = 100% if target altitude is not within climbout_diff meters */
         if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
-
-            Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
-            Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
 
             // mavlink_log_critical(&_mavlink_log_pub, "t_p: lat=%.10f lon=%.10f", prev_wp_takeoff(0), prev_wp_takeoff(1));
             // mavlink_log_critical(&_mavlink_log_pub, "t_c: lat=%.10f lon=%.10f", curr_wp_takeoff(0), curr_wp_takeoff(1));
