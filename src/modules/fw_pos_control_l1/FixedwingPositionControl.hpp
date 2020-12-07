@@ -108,7 +108,7 @@ using namespace runwaytakeoff;
 using namespace time_literals;
 
 static constexpr float HDG_HOLD_DIST_NEXT =
-        500.0f; // initial distance of waypoint in front of plane in heading hold mode
+        1500.0f; // initial distance of waypoint in front of plane in heading hold mode
 static constexpr float HDG_HOLD_REACHED_DIST =
         1000.0f; // distance (plane to waypoint in front) at which waypoints are reset in heading hold mode
 static constexpr float HDG_HOLD_SET_BACK_DIST = 100.0f; // distance by which previous waypoint is set behind the plane
