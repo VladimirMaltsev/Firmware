@@ -157,12 +157,12 @@ MissionBlock::is_mission_item_reached()
 				//so loiter is needed if
 				//			1. param1 (hold or time_inside) eq
 				//			2. altitude difference > altitude acceptance radius
-				if (prev_sp->valid && (_mission_item.time_inside > 0.5f || fabs(curr_sp->alt - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){
+				if (prev_sp->valid && (_mission_item.time_inside > 0.5f || fabs(altitude_amsl - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){
 					_needing_loiter = true;
 
 					struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
 
-					mavlink_log_critical(&_mavlink_log_pub, "dist=%f dist_xy=%f", dist, dist_xy);
+					//mavlink_log_critical(&_mavlink_log_pub, "dist=%f dist_xy=%f", dist, dist_xy);
 					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp->lat, curr_sp->lon);
 					float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp->lat, curr_sp->lon, next_sp->lat, next_sp->lon);
 
@@ -179,7 +179,7 @@ MissionBlock::is_mission_item_reached()
 			}
 
 			if (dist_xy < _navigator->get_loiter_radius()/2.f && _needing_loiter && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
-				mavlink_log_critical(&_mavlink_log_pub, "dist = rad/2, switch to loiter");
+				mavlink_log_critical(&_mavlink_log_pub, "switch to loiter");
 				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 				curr_sp->loiter_radius = _navigator->get_loiter_radius();
 				curr_sp->loiter_direction = _loiter_direction;

@@ -1606,10 +1606,8 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 
         if (!parachute_released){
             release_parachute();
+            parachute_released = true;
         }
-
-        parachute_released = true;
-
     }
     if (parachute_released){
         throttle_land = 0.f;
