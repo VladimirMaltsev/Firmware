@@ -1314,9 +1314,14 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         _att_sp.thrust_body[0] = 0.f;
         if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
             release_parachute();
-            play_tune(11);
+
             set_mode();
             set_arm(false);
+
+            if (_vehicle_land_detected.landed){
+                mavlink_log_critical(&_mavlink_log_pub, "Virtual drop");
+                play_tune(11);
+            }
         }
     }
 
