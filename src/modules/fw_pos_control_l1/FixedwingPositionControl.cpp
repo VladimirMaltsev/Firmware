@@ -1312,11 +1312,12 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
     if (unexpected_descent){
         _att_sp.thrust_body[0] = 0.f;
+        set_mode();
+        set_arm(false);
         if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
-            release_parachute();
 
-            set_mode();
-            set_arm(false);
+            if (!_vehicle_land_detected.landed)
+                release_parachute();
 
             if (_vehicle_land_detected.landed){
                 mavlink_log_critical(&_mavlink_log_pub, "Virtual drop");
