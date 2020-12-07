@@ -1707,10 +1707,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         _launch_detection_state = LAUNCHDETECTION_RES_NONE;
         _launch_detection_notify = 0;
 
-        if (bano_enabled){
-            bano_enabled = false;
-            bano_enable(false);
-        }
+        // if (bano_enabled){
+        //     bano_enabled = false;
+        //     bano_enable(false);
+        // }
     }
 
     /* Perform launch detection */
