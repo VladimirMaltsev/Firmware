@@ -1444,9 +1444,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                 // drop_parachute();
                 // parachute_dropped = true;
 
-                // play_tune(11);
-                // set_mode();
-                // set_arm(false);
+                play_tune(11);
+                set_mode();
+                set_arm(false);
             }
         }
     }
@@ -2072,19 +2072,19 @@ FixedwingPositionControl::run() {
             Vector2f curr_pos((float) _global_pos.lat, (float) _global_pos.lon);
             Vector2f ground_speed(_global_pos.vel_n, _global_pos.vel_e);
 
-            if (unexpected_descent){
-                _att_sp.thrust_body[0] = 0.f;
-                is_landing = true;
-                engine_enable(false);
-                if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
-                    release_parachute();
-                    release_buffer();
+            // if (unexpected_descent){
+            //     _att_sp.thrust_body[0] = 0.f;
+            //     is_landing = true;
+            //     engine_enable(false);
+            //     if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
+            //         release_parachute();
+            //         release_buffer();
 
-                    // play_tune(11);
-                    // set_mode();
-                    // set_arm(false);
-                }
-            }
+            //         // play_tune(11);
+            //         // set_mode();
+            //         // set_arm(false);
+            //     }
+            // }
 
             if (pret == 0 && !_control_mode.flag_control_altitude_enabled ) {
                 continue;
