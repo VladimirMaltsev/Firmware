@@ -178,6 +178,9 @@ public:
         hrt_abstime unexp_desc_time{0};
         hrt_abstime release_parachute_timer{0};
 
+        bool detecting_pr_failsafe;
+        hrt_abstime pr_time_fsafe{0};
+
 
 private:
     orb_advert_t	_mavlink_log_pub{nullptr};

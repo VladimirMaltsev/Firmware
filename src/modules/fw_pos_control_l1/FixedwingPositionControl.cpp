@@ -1269,7 +1269,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             // when we are landed state we want the motor to spin at idle speed
             _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
         } else {
-            _att_sp.thrust_body[0] = min(get_tecs_thrust(), throttle_max);
+            _att_sp.thrust_body[0] = get_tecs_thrust();
         }
     }
 
@@ -1332,8 +1332,9 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
             if (((diff - dangerous_diff) > 16) && (
                 (dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 16)){
                 //detected an unexpected descent
+                if (!unexpected_descent)
+                    unexp_desc_time = hrt_absolute_time();
                 unexpected_descent = true;
-                unexp_desc_time = hrt_absolute_time();
                 mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / ((float)hrt_elapsed_time(&dang_alt_time_det) / (float) 1e6));
             } else
             {
