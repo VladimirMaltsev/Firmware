@@ -1484,18 +1484,18 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 void
 FixedwingPositionControl::bano_enable(bool enable){
-        vehicle_command_s vcmd_engine_off = {};
-        vcmd_engine_off.timestamp = hrt_absolute_time();
-        vcmd_engine_off.command = 27605;
-        vcmd_engine_off.param1 = enable ? 1 : 0;
-        vcmd_engine_off.target_component = 0;
-        vcmd_engine_off.target_system = 0;
-        vcmd_engine_off.source_system = 1;
-        vcmd_engine_off.source_component = 1;
-        vcmd_engine_off.confirmation = 0;
-        vcmd_engine_off.from_external = false;
+        vehicle_command_s bano = {};
+        bano.timestamp = hrt_absolute_time();
+        bano.command = 27605;
+        bano.param1 = enable ? 1 : 0;
+        bano.target_component = 0;
+        bano.target_system = 0;
+        bano.source_system = 1;
+        bano.source_component = 1;
+        bano.confirmation = 0;
+        bano.from_external = false;
 
-        orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
+        orb_advertise_queue(ORB_ID(vehicle_command), &bano, vehicle_command_s::ORB_QUEUE_LENGTH);
 }
 
 void FixedwingPositionControl::engine_enable(bool enable){
