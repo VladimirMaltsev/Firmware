@@ -435,7 +435,7 @@ FixedwingPositionControl::airspeed_poll() {
 
             _airspeed = as.indicated_airspeed_m_s;
 
-            if (climbout_completed && (_airspeed > (_parameters.airspeed_max + 3.f) || _airspeed < (_parameters.airspeed_min - 3.f))){
+            if (climbout_completed && (_airspeed > (_parameters.airspeed_max + 5.f) || _airspeed < (_parameters.airspeed_min - 3.f))){
                 if (hrt_elapsed_time(&_airspeed_last_valid) > 1_s) {
                     airspeed_valid = false;
                     mavlink_log_critical(&_mavlink_log_pub, "Invalid airspeed = %.2f", _airspeed);
@@ -970,14 +970,14 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     float throttle_max = 1.0f;
 
     /* save time when airplane is in air */
-    if (!_was_in_air && !_vehicle_land_detected.landed) {
+    if (!_was_in_air && !_vehicle_land_detected.landed && _control_mode.flag_armed) {
         _was_in_air = true;
         _time_went_in_air = hrt_absolute_time();
         _takeoff_ground_alt = _global_pos.alt;
     }
 
     /* reset flag when airplane landed */
-    if (_vehicle_land_detected.landed) {
+    if (_vehicle_land_detected.landed || !_control_mode.flag_armed) {
         _was_in_air = false;
     }
 
@@ -1276,7 +1276,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
 
-        if (_vehicle_land_detected.landed) {
+        if (_vehicle_land_detected.landed || !_control_mode.flag_armed) {
             throttle_max = 0.0f;
         }
 
@@ -1325,7 +1325,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         /* throttle limiting */
         throttle_max = _parameters.throttle_max;
 
-        if (_vehicle_land_detected.landed) {
+        if (_vehicle_land_detected.landed || !_control_mode.flag_armed) {
             throttle_max = 0.0f;
         }
 
@@ -1389,7 +1389,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
     } else {
         /* Copy thrust and pitch values from tecs */
-        if (_vehicle_land_detected.landed) {
+        if (_vehicle_land_detected.landed || !_control_mode.flag_armed) {
             // when we are landed state we want the motor to spin at idle speed
             if (!ready_to_fly)
                 _att_sp.thrust_body[0] = min(_parameters.throttle_idle, throttle_max);
@@ -1421,9 +1421,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             release_parachute();
             release_buffer();
 
-            if (_vehicle_land_detected.landed) {
-                drop_parachute();
-                parachute_dropped = true;
+            if (!parachute_dropped && _vehicle_land_detected.landed) {
+                //  drop_parachute();
+                mavlink_log_critical(&_mavlink_log_pub, "Virtual drop");
+                //parachute_dropped = true;
 
                 play_tune(11);
                 set_mode();
@@ -1440,7 +1441,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     // auto runway takeoff
     use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_AUTO &&
                         pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
-                        (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS || _vehicle_land_detected.landed ||
+                        (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS || _vehicle_land_detected.landed || !_control_mode.flag_armed ||
                          _runway_takeoff.runwayTakeoffEnabled()));
 
     // flaring during landing
@@ -2108,7 +2109,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
     _last_tecs_update = hrt_absolute_time();
 
     // do not run TECS if we are not in air
-    bool run_tecs = !_vehicle_land_detected.landed;
+    bool run_tecs = !(_vehicle_land_detected.landed || !_control_mode.flag_armed);
 
     // do not run TECS if vehicle is a VTOL and we are in rotary wing mode or in transition
     // (it should also not run during VTOL blending because airspeed is too low still)
@@ -2185,7 +2186,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
     }
 
     /* tell TECS to update its state, but let it know when it cannot actually control the plane */
-    bool in_air_alt_control = (!_vehicle_land_detected.landed &&
+    bool in_air_alt_control = ((!(_vehicle_land_detected.landed || !_control_mode.flag_armed)) &&
                                (_control_mode.flag_control_auto_enabled ||
                                 _control_mode.flag_control_velocity_enabled ||
                                 _control_mode.flag_control_altitude_enabled));

@@ -95,9 +95,9 @@ float FixedwingLandDetector::_get_max_altitude()
 bool FixedwingLandDetector::_get_landed_state()
 {
 	// only trigger flight conditions if we are armed
-	if (!_arming.armed) {
-		return true;
-	}
+	// if (!_arming.armed) {
+	// 	return true;
+	// }
 
 	bool landDetected = false;
 
