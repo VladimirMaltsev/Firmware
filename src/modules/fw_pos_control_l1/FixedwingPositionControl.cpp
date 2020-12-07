@@ -1277,7 +1277,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
     if (unexpected_descent){
         _att_sp.thrust_body[0] = 0.f;
-        if (hrt_elapsed_time(&unexp_desc_time) > 2e6) {
+        if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
             release_parachute();
             play_tune(11);
             set_mode();
@@ -1326,15 +1326,15 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
             dang_alt_time_det = hrt_absolute_time();
         }
     } else {
-        if (hrt_elapsed_time(&dang_alt_time_det) > 3e6) {
+        if (hrt_elapsed_time(&dang_alt_time_det) > 2e6) {
             float diff = pos_sp_curr.alt - _global_pos.alt;
             float curr_dist_to_takeoff_alt = _global_pos.alt - _takeoff_ground_alt;
-            if (((diff - dangerous_diff) > 25) && (
-                (dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 25)){
+            if (((diff - dangerous_diff) > 16) && (
+                (dangerous_dist_to_takeoff_alt - curr_dist_to_takeoff_alt) > 16)){
                 //detected an unexpected descent
                 unexpected_descent = true;
                 unexp_desc_time = hrt_absolute_time();
-                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / 3.f);
+                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / ((float)hrt_elapsed_time(&dang_alt_time_det) / (float) 1e6));
             } else
             {
                 check_unexp_desc = false;
@@ -1474,6 +1474,11 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         if (_control_mode.flag_armed) {
             /* Perform launch detection */
+
+            float thr_100 = 0.9f;
+			param_set(param_find("FW_THR_MAX"), &thr_100);
+			int enable_airspeed = 0;
+			param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 
             if (!fixed_takeoff_line) {
                 fixed_takeoff_line = true;

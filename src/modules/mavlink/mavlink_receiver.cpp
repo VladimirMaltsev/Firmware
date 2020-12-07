@@ -503,7 +503,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 
 			param_set(param_find("FW_THR_MAX"), &min_thr);
 
-			px4_sleep(2);
+			px4_sleep(1);
 
 			float zero_thr = 0.f;
 			param_set(param_find("FW_THR_MIN"), &zero_thr);
@@ -562,7 +562,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			}
 		//-SET-MODE-END-----------------------------
 
-			px4_sleep(2);
+			px4_sleep(1);
 
 			if (sys_autostart == 3239) {
 				act1.control[5] = 0.65f;
