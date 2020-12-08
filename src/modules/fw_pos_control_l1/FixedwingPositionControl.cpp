@@ -1327,6 +1327,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
         if (_vehicle_land_detected.landed || !_control_mode.flag_armed) {
             throttle_max = 0.0f;
+            _att_sp.pitch_body = radians(_manual.x);
         }
 
         tecs_update_pitch_throttle(_hold_alt,
