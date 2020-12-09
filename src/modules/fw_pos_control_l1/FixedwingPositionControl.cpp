@@ -1241,6 +1241,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
         if (_vehicle_land_detected.landed || !_control_mode.flag_armed ) {
             throttle_max = 0.0f;
+            _att_sp.pitch_body = radians(_manual.x);
         }
 
         tecs_update_pitch_throttle(_hold_alt,
@@ -1254,6 +1255,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
                                    climbout_requested ? radians(10.0f) : _parameters.pitch_limit_min,
                                    tecs_status_s::TECS_MODE_NORMAL);
 
+        if (_vehicle_land_detected.landed || !_control_mode.flag_armed ) {
+            _att_sp.pitch_body = radians(_manual.x);
+        }
         _att_sp.roll_body = radians(_manual.y);
         _att_sp.yaw_body = 0;
 
@@ -1331,7 +1335,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     bool use_tecs_pitch = true;
 
     // auto runway takeoff
-    use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_AUTO &&
+    use_tecs_pitch &= !(!_control_mode.flag_armed || _control_mode_current == FW_POSCTRL_MODE_AUTO &&
                         pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
                         (_launch_detection_state == LAUNCHDETECTION_RES_NONE ||
                          _runway_takeoff.runwayTakeoffEnabled()));
