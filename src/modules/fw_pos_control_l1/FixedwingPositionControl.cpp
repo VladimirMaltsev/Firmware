@@ -1577,7 +1577,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
 
             /* populate l1 control setpoint */
-            _l1_control.navigate_waypoints(prev_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+            _l1_control.navigate_waypoints(curr_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
 
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
             _att_sp.yaw_body = _l1_control.nav_bearing();
@@ -1597,6 +1597,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
             // /* limit roll motion to ensure enough lift */
             _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
+            _att_sp.roll_reset_integral = true;
+            _att_sp.yaw_reset_integral = true;
 
         } else {
             climbout_completed = true;
