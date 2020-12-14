@@ -1675,6 +1675,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                 // create virtual waypoint in 500m ahead before takeoff
                 Eulerf euler(Quatf(_att.q));
                 get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+                prev_wp_takeoff(0) = (float) _hdg_hold_prev_wp.lat;
+                prev_wp_takeoff(1) = (float) _hdg_hold_prev_wp.lon;
+                curr_wp_takeoff(0) = (float) _hdg_hold_curr_wp.lat;
+                curr_wp_takeoff(1) = (float) _hdg_hold_curr_wp.lon;
                 _takeoff_ground_alt = _global_pos.alt;
             }
 
@@ -1716,9 +1720,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
         if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
-
-            Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
-            Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
+            mavlink_log_critical(&_mavlink_log_pub, "climbout completed");
 
             /* populate l1 control setpoint */
             _l1_control.navigate_waypoints(prev_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);

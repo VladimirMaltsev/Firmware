@@ -316,6 +316,9 @@ private:
     float _asp_after_transition{0.0f};
     bool _was_in_transition{false};
 
+    Vector2f prev_wp_takeoff{0.f, 0.f};
+    Vector2f curr_wp_takeoff{0.f, 0.f};
+
     // estimator reset counters
     uint8_t _pos_reset_counter{0};				///< captures the number of times the estimator has reset the horizontal position
     uint8_t _alt_reset_counter{0};				///< captures the number of times the estimator has reset the altitude state
