@@ -1748,7 +1748,10 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         tecs_status_s::TECS_MODE_TAKEOFF);
 
             /* limit roll motion to ensure enough lift */
-            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-15.0f), radians(15.0f));
+            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-5.0f), radians(5.0f));
+             _att_sp.roll_reset_integral = true;
+            _att_sp.yaw_reset_integral = true;
+
 
         } else {
             climbout_completed - true;
