@@ -1583,7 +1583,7 @@ FixedwingPositionControl::play_tune(uint8_t id){
 
 void
 FixedwingPositionControl::release_buffer(){
-    act1.control[6] = 0.2f; //buffer drop
+    act1.control[6] = 0.25f; //buffer drop
     act1.timestamp = hrt_absolute_time();
     if (act_pub1 != nullptr) {
         orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
