@@ -1596,11 +1596,12 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
 
             // /* limit roll motion to ensure enough lift */
-            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
+            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-1.0f), radians(1.0f));
             _att_sp.roll_reset_integral = true;
-            _att_sp.yaw_reset_integral = true;
+            //_att_sp.yaw_reset_integral = true;
 
         } else {
+            mavlink_log_critical(&_mavlink_log_pub, "climbout completed");
             climbout_completed = true;
 
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
