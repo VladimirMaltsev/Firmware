@@ -1720,10 +1720,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
         /* apply minimum pitch and limit roll if target altitude is not within climbout_diff meters */
         if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
-            mavlink_log_critical(&_mavlink_log_pub, "climbout completed");
 
             /* populate l1 control setpoint */
-            _l1_control.navigate_waypoints(prev_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+            _l1_control.navigate_waypoints(curr_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
 
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
             _att_sp.yaw_body = _l1_control.nav_bearing();
@@ -1750,12 +1749,13 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         tecs_status_s::TECS_MODE_TAKEOFF);
 
             /* limit roll motion to ensure enough lift */
-            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-5.0f), radians(5.0f));
+            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-1.0f), radians(1.0f));
              _att_sp.roll_reset_integral = true;
-            _att_sp.yaw_reset_integral = true;
+            //_att_sp.yaw_reset_integral = true;
 
 
         } else {
+            mavlink_log_critical(&_mavlink_log_pub, "climbout completed");
             climbout_completed - true;
 
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
