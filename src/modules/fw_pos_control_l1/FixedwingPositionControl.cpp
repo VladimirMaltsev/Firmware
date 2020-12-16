@@ -1526,7 +1526,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             /* Perform launch detection */
 
             float thr_100 = 0.9f;
+            float electric_min = 0.13f;
 			param_set(param_find("FW_THR_MAX"), &thr_100);
+            param_set(param_find("FW_THR_MIN"), &electric_min);
 			int enable_airspeed = 0;
 			param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 
