@@ -1683,7 +1683,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_min = 0.f;
     }
 
-    if (!parachute_dropped && _vehicle_land_detected.landed) {
+    if (_vehicle_land_detected.landed) {
         drop_parachute();
         parachute_dropped = true;
 
