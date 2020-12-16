@@ -1440,7 +1440,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     bool use_tecs_pitch = true;
 
     // auto runway takeoff
-    use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_AUTO &&
+    use_tecs_pitch &= !((_control_mode_current == FW_POSCTRL_MODE_AUTO || _control_mode_current == FW_POSCTRL_MODE_ALTITUDE )&&
                         pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
                         (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS || _vehicle_land_detected.landed || !_control_mode.flag_armed ||
                          _runway_takeoff.runwayTakeoffEnabled()));
