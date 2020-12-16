@@ -457,7 +457,7 @@ FixedwingPositionControl::airspeed_poll() {
             if (climbout_completed && (_airspeed > (_parameters.airspeed_max + 5.f) || _airspeed < (_parameters.airspeed_min - 3.f))){
                 if (hrt_elapsed_time(&_airspeed_last_valid) > 1_s) {
                     airspeed_valid = false;
-                    mavlink_log_critical(&_mavlink_log_pub, "Invalid airspeed = %.2f", _airspeed);
+                    mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Invalid airspeed = %.2f", _airspeed);
                 }
             }else {
                 _airspeed_last_valid = as.timestamp;
@@ -539,7 +539,7 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     const float max_pitch(fabsf(math::radians(max_pitch_deg)));
 
     if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
-        mavlink_log_critical(&_mavlink_log_pub, "HA: p_m=%.3f p=%.3f | r_m=%.3f r = %.3f", max_pitch, _pitch, max_roll, _roll);
+        mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Pitch=%.3f Roll=%.3f", _pitch, _roll);
 
         //if previous unsafe situations occured more than 10s ago then reset timer
         if (detecting_pr_failsafe && hrt_elapsed_time(&pr_time_fsafe) > 5e6){
@@ -1329,7 +1329,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             _hold_alt = _global_pos.alt;
             _manual_mode_last_updated = hrt_absolute_time();
             _manual_mode_enabled = true;
-            mavlink_log_critical(&_mavlink_log_pub, "manual control enabled");
+            mavlink_log_critical(&_mavlink_log_pub, " [Mode] Manual control enabled");
         }
 
         _control_mode_current = FW_POSCTRL_MODE_ALTITUDE;
@@ -1426,7 +1426,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
         if (hrt_elapsed_time(&_engine_restart_thr_delay) > 4e6) {
             enable_engine_restart = false;
-            mavlink_log_critical(&_mavlink_log_pub, "Engine restarted");
+            mavlink_log_critical(&_mavlink_log_pub, " [Engine] Restarted");
         }
     }
 
@@ -1441,9 +1441,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             release_buffer();
 
             if (!parachute_dropped && _vehicle_land_detected.landed) {
-                mavlink_log_critical(&_mavlink_log_pub, "Virtual drop");
+                mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Virtual drop");
                 // drop_parachute();
-                // parachute_dropped = true;
+                parachute_dropped = true;
 
                 play_tune(11);
                 set_mode();
@@ -1502,7 +1502,7 @@ FixedwingPositionControl::bano_enable(bool enable){
 void FixedwingPositionControl::engine_enable(bool enable){
 
     if (enable){
-        mavlink_log_critical(&_mavlink_log_pub, "Engine ON");
+        mavlink_log_critical(&_mavlink_log_pub, " [Engine] ON");
         vehicle_command_s vcmd_engine_off = {};
         vcmd_engine_off.timestamp = hrt_absolute_time();
         vcmd_engine_off.command = 27601;
@@ -1516,7 +1516,7 @@ void FixedwingPositionControl::engine_enable(bool enable){
 
         orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
     }else {
-        mavlink_log_critical(&_mavlink_log_pub, "Engine OFF");
+        mavlink_log_critical(&_mavlink_log_pub, " [Engine] OFF");
         vehicle_command_s vcmd_engine_off = {};
         vcmd_engine_off.timestamp = hrt_absolute_time();
         vcmd_engine_off.command = 27601;
@@ -1615,7 +1615,7 @@ FixedwingPositionControl::detect_unexpected_descent(position_setpoint_s pos_sp_c
                 if (!unexpected_descent)
                     unexp_desc_time = hrt_absolute_time();
                 unexpected_descent = true;
-                mavlink_log_critical(&_mavlink_log_pub, "Unexpected descent %fm/s", (diff - dangerous_diff) / (float)hrt_elapsed_time(&dang_alt_time_det));
+                mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Unexpected descent %fm/s", (diff - dangerous_diff) / ((float)hrt_elapsed_time(&dang_alt_time_det) / (float)1e6));
             } else
             {
                 check_unexp_desc = false;
@@ -1645,7 +1645,7 @@ FixedwingPositionControl::release_buffer(){
     } else {
         act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
     }
-    mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+    mavlink_log_critical(&_mavlink_log_pub, " [Buffer] Released");
 }
 
 void
@@ -1657,7 +1657,7 @@ FixedwingPositionControl::release_parachute(){
     } else {
         act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
     }
-    mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+    mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Released");
 }
 
 void
@@ -1669,7 +1669,7 @@ FixedwingPositionControl::close_parachute(){
     } else {
         act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
     }
-    mavlink_log_critical(&_mavlink_log_pub, "Parachute is released");
+    mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Closed");
 }
 
 void
@@ -1682,7 +1682,7 @@ FixedwingPositionControl::drop_parachute(){
     } else {
         act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
     }
-    mavlink_log_critical(&_mavlink_log_pub, "Parachute is dropped");
+    mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Dropped");
 }
 
 void
@@ -1736,8 +1736,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                 prev_wp_takeoff(1) = (float) _hdg_hold_prev_wp.lon;
                 curr_wp_takeoff(0) = (float) _hdg_hold_curr_wp.lat;
                 curr_wp_takeoff(1) = (float) _hdg_hold_curr_wp.lon;
-                mavlink_log_critical(&_mavlink_log_pub, "Prev: lat1=%.10f lat2=%.10f", (float) _hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon);
-                mavlink_log_critical(&_mavlink_log_pub, "Curr: lat1=%.10f lat2=%.10f", (float) _hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon);
+                mavlink_log_critical(&_mavlink_log_pub, " [Takeoff] virt_p1: lat1=%.8f lat2=%.8f", (float) _hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon);
+                mavlink_log_critical(&_mavlink_log_pub, " [Takeoff] virt_p2: lat1=%.8f lat2=%.8f", (float) _hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon);
                 _takeoff_ground_alt = _global_pos.alt;
             }
 
@@ -1896,7 +1896,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 
     if (_land_motor_lim && !parachute_released){
         if (hrt_elapsed_time(&release_parachute_timer) > 3e6) {
-                mavlink_log_critical(&_mavlink_log_pub, "Landing timer");
+                mavlink_log_critical(&_mavlink_log_pub, " [Land] Landing timer");
                 release_parachute();
                 release_buffer();
                 parachute_released = true;
