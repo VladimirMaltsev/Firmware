@@ -1724,6 +1724,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             //TODO write module for parachute control to solve this issue
             float thr_100 = 0.9f;
 			param_set(param_find("FW_THR_MAX"), &thr_100);
+            param_set(param_find("FW_THR_MIN"), &_parameters.throttle_idle);
 			int enable_airspeed = 0;
 			param_set(param_find("FW_ARSP_MODE"), &enable_airspeed);
 
