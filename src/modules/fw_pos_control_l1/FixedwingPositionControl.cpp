@@ -1458,7 +1458,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
     bool use_tecs_pitch = true;
 
     // auto runway takeoff
-    use_tecs_pitch &= !(_control_mode_current == FW_POSCTRL_MODE_AUTO &&
+    use_tecs_pitch &= !(!_control_mode.flag_armed || !_control_mode_current == FW_POSCTRL_MODE_AUTO &&
                         pos_sp_curr.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF &&
                         (_launch_detection_state != LAUNCHDETECTION_RES_DETECTED_ENABLEMOTORS || _vehicle_land_detected.landed || !_control_mode.flag_armed ||
                          _runway_takeoff.runwayTakeoffEnabled()));
@@ -1819,7 +1819,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                                         tecs_status_s::TECS_MODE_TAKEOFF);
 
             /* limit roll motion to ensure enough lift */
-            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-10.0f), radians(10.0f));
+            _att_sp.roll_body = constrain(_att_sp.roll_body, radians(-1.0f), radians(1.0f));
+            _att_sp.roll_reset_integral = true;
 
         } else {
             climbout_completed = true;
