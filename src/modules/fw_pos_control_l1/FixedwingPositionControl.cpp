@@ -1422,10 +1422,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             release_parachute();
             release_buffer();
 
-            if (!parachute_dropped && _vehicle_land_detected.landed) {
+            if (_vehicle_land_detected.landed) {
                 //  drop_parachute();
                 mavlink_log_critical(&_mavlink_log_pub, "[Parachute] Virtual dropped");
-                //parachute_dropped = true;
+                parachute_dropped = true;
 
                 play_tune(11);
                 set_mode();
@@ -1844,7 +1844,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_min = 0.f;
     }
 
-    if (!parachute_dropped && _vehicle_land_detected.landed) {
+    if (_vehicle_land_detected.landed) {
         drop_parachute();
         parachute_dropped = true;
 
