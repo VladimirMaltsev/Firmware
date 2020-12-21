@@ -1321,8 +1321,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
             if (!_vehicle_land_detected.landed) {
                 release_parachute();
-                set_mode();
-                set_arm(false);
+                // set_mode();
+                // set_arm(false);
             }
 
             if (_vehicle_land_detected.landed){
