@@ -1440,14 +1440,16 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             release_parachute();
             release_buffer();
 
-            if (_vehicle_land_detected.landed) {
-                mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Virtual drop");
-                // drop_parachute();
-                parachute_dropped = true;
+            if (hrt_elapsed_time(&unexp_desc_time) > 4e6) {
+                if (_vehicle_land_detected.landed) {
+                    mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Virtual drop");
+                    // drop_parachute();
+                    parachute_dropped = true;
 
-                play_tune(11);
-                set_mode();
-                set_arm(false);
+                    play_tune(11);
+                    set_mode();
+                    set_arm(false);
+                }
             }
         }
     }
@@ -1911,13 +1913,17 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
         throttle_min = 0.f;
     }
 
-    if (!parachute_dropped && _vehicle_land_detected.landed) {
-        drop_parachute();
-        parachute_dropped = true;
 
-        play_tune(11);
-        set_mode();
-        set_arm(false);
+    if (hrt_elapsed_time(&release_parachute_timer) > 8e6) {
+        if (_vehicle_land_detected.landed) {
+            mavlink_log_critical(&_mavlink_log_pub, "[Land] Landing detected");
+            drop_parachute();
+            parachute_dropped = true;
+
+            play_tune(11);
+            set_mode();
+            set_arm(false);
+        }
     }
 
     tecs_update_pitch_throttle(pos_sp_curr.alt,
