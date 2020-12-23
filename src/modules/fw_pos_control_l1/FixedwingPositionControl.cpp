@@ -1438,7 +1438,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         engine_enable(false);
         if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
             release_parachute();
-            release_buffer();
+
+            if (!_vehicle_land_detected.landed){
+                release_buffer();
+            }
 
             if (hrt_elapsed_time(&unexp_desc_time) > 4e6) {
                 if (_vehicle_land_detected.landed) {
