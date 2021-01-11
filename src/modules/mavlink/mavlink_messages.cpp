@@ -4917,7 +4917,9 @@ public:
 
 private:
     MavlinkOrbSubscription *_sub;
+    MavlinkOrbSubscription *_adc_sub;
     uint64_t _stg_status_time{0};
+    uint64_t _adc_report_time{0};
 
     /* do not allow top copying this class */
     MavlinkStreamStgStatusNew(MavlinkStreamStgStatusNew &) = delete;
@@ -4926,13 +4928,17 @@ private:
 protected:
     explicit MavlinkStreamStgStatusNew(Mavlink *mavlink) : MavlinkStream(mavlink),
         _sub(_mavlink->add_orb_subscription(ORB_ID(stg_status))),  // make sure you enter the name of your uORB topic here
-        _stg_status_time(0)
+        _stg_status_time(0),
+
+	_adc_sub(_mavlink->add_orb_subscription(ORB_ID(adc_report))),
+        _adc_report_time(0)
     {}
 
     bool send(const hrt_abstime t)
     {
 
         struct stg_status_s _stg_status = {};    //make sure stg_status_struct_s is the definition of your uORB topic
+	struct adc_report_s _adc_report = {};
 
         if (_sub->update(&_stg_status_time, &_stg_status)) {
            	 mavlink_stg_status_new_t _msg_stg_status;  //make sure mavlink_stg_status_t is the definition of your custom MAVLink message
@@ -4947,6 +4953,20 @@ protected:
 			_msg_stg_status.uptime = _stg_status.uptime;
 			_msg_stg_status.motor_state = _stg_status.motor_state;
 			_msg_stg_status.stg_errors_bitmask = _stg_status.stg_errors_bitmask;
+
+			_adc_sub->update(&_adc_report_time, &_adc_report);
+			float tempVolt = _adc_report.channel_value[10];
+			int temp = 190;
+			for (; temp >= 0; temp--) {
+				if (tempVolt < NTC_temp[temp]){
+					temp -= 40;
+					break;
+				}
+			}
+
+			//mavlink_log_info(&_mavlink_log_pub, "adc sended");
+			_msg_stg_status.engine_temperature = temp;
+
 
 			mavlink_msg_stg_status_new_send_struct(_mavlink->get_channel(), &_msg_stg_status);
 
