@@ -83,6 +83,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
 #include <uORB/topics/stg_status.h>
+#include <uORB/topics/adc_report.h>
 #include <uORB/topics/engine_status.h>
 
 #include "mavlink_ftp.h"
@@ -211,6 +212,7 @@ private:
 
 	Mavlink	*_mavlink;
 
+
 	MavlinkFTP			_mavlink_ftp;
 	MavlinkLogHandler		_mavlink_log_handler;
 	MavlinkTimesync			_mavlink_timesync;
@@ -286,10 +288,12 @@ private:
 	int _actuator_armed_sub{orb_subscribe(ORB_ID(actuator_armed))};
 	int _control_mode_sub{orb_subscribe(ORB_ID(vehicle_control_mode))};
 	int _vehicle_attitude_sub{orb_subscribe(ORB_ID(vehicle_attitude))};
+	int _adc_sub{orb_subscribe(ORB_ID(adc_report))};
 
 	int _orb_class_instance{-1};
 
 	uint64_t _global_ref_timestamp{0};
+    	uint64_t _adc_report_time{0};
 
 	bool _hil_local_proj_inited{false};
 
