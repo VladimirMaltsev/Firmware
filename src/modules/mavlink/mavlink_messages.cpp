@@ -4959,7 +4959,7 @@ protected:
 			int temp = 190;
 			for (; temp >= 0; temp--) {
 				if (tempVolt < NTC_temp[temp]){
-					temp -= 40;
+					temp += 10;
 					break;
 				}
 			}
