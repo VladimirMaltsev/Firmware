@@ -1579,11 +1579,12 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
         if (!climbout_completed && _parameters.climbout_diff > 0.0f && altitude_diff < _parameters.climbout_diff) {
             /* enforce a minimum of 10 degrees pitch up on takeoff, or take parameter */
 
-            Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
-            Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
+            // Vector2f prev_wp_takeoff{(float) _hdg_hold_prev_wp.lat, (float) _hdg_hold_prev_wp.lon};
+            // Vector2f curr_wp_takeoff{(float) _hdg_hold_curr_wp.lat, (float) _hdg_hold_curr_wp.lon};
 
-            /* populate l1 control setpoint */
-            _l1_control.navigate_waypoints(curr_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+            // /* populate l1 control setpoint */
+            // _l1_control.navigate_waypoints(curr_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+            _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
 
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
             _att_sp.yaw_body = _l1_control.nav_bearing();
