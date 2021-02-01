@@ -1799,7 +1799,8 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             // mavlink_log_critical(&_mavlink_log_pub, "t_c: lat=%.10f lon=%.10f", curr_wp_takeoff(0), curr_wp_takeoff(1));
 
             /* populate l1 control setpoint */
-            _l1_control.navigate_waypoints(curr_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+            //_l1_control.navigate_waypoints(curr_wp_takeoff, curr_wp_takeoff, curr_pos, ground_speed);
+            _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
 
             _att_sp.roll_body = _l1_control.get_roll_setpoint();
             _att_sp.yaw_body = _l1_control.nav_bearing();
