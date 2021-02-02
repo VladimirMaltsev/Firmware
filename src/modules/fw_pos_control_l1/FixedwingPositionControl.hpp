@@ -75,6 +75,7 @@
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_bias.h>
+#include <uORB/topics/speed_status.h>
 #include <uORB/topics/tecs_status.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
@@ -196,6 +197,7 @@ private:
     int		_params_sub{-1};			///< notification of parameter updates */
     int		_manual_control_sub{-1};		///< notification of manual control updates */
     int		_sensor_baro_sub{-1};
+    int     _speed_status_sub{-1};
 
     orb_advert_t	_attitude_sp_pub{nullptr};		///< attitude setpoint */
     orb_advert_t	_pos_ctrl_status_pub{nullptr};		///< navigation capabilities publication */
@@ -212,6 +214,7 @@ private:
     orb_id_t _attitude_setpoint_id{nullptr};
 
     manual_control_setpoint_s	_manual {};			///< r/c channel data */
+    speed_status_s              _speed_status{};
     position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items */
     vehicle_attitude_s	_att {};			///< vehicle attitude setpoint */
     vehicle_attitude_setpoint_s	_att_sp {};			///< vehicle attitude setpoint */
@@ -456,6 +459,7 @@ private:
     void		vehicle_control_mode_poll();
     void		vehicle_land_detected_poll();
     void		vehicle_status_poll();
+    void        speed_status_poll();
 
     void		status_publish();
     void		landing_status_publish();

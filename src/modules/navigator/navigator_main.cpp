@@ -470,8 +470,9 @@ Navigator::run()
 
 				if (_speed_status.speed_type != cmd.param1) {
 					_speed_status.speed_type = cmd.param1;
-					if (cmd.param1 == 0)
+					if (cmd.param1 == 0) {
 						mavlink_log_critical(&_mavlink_log_pub, "[Mode] Airspeed");
+					}
 					else {
 						mavlink_log_critical(&_mavlink_log_pub, "[Mode] Ground Speed");
 					}

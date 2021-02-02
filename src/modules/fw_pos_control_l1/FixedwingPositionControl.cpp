@@ -400,6 +400,16 @@ FixedwingPositionControl::manual_control_setpoint_poll() {
 }
 
 void
+FixedwingPositionControl::speed_status_poll(){
+    bool status_updated;
+    orb_check(_speed_status_sub, &status_updated);
+
+    if (status_updated){
+        orb_copy(ORB_ID(speed_status), _speed_status_sub, &_speed_status);
+    }
+}
+
+void
 FixedwingPositionControl::airspeed_poll() {
     bool airspeed_valid = _airspeed_valid;
 
@@ -1759,6 +1769,7 @@ FixedwingPositionControl::run() {
     _vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
     _params_sub = orb_subscribe(ORB_ID(parameter_update));
     _manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
+    _speed_status_sub = orb_subscribe(ORB_ID(speed_status));
     _sensor_baro_sub = orb_subscribe(ORB_ID(sensor_baro));
 
     /* rate limit position updates to 50 Hz */
@@ -1838,6 +1849,7 @@ FixedwingPositionControl::run() {
 
             _sub_sensors.update();
             airspeed_poll();
+            speed_status_poll();
             manual_control_setpoint_poll();
             position_setpoint_triplet_poll();
             vehicle_attitude_poll();
