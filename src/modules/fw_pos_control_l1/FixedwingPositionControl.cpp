@@ -406,6 +406,7 @@ FixedwingPositionControl::speed_status_poll(){
 
     if (status_updated){
         orb_copy(ORB_ID(speed_status), _speed_status_sub, &_speed_status);
+    _speed_type = _speed_status.speed_type;
     }
 }
 
@@ -598,11 +599,15 @@ FixedwingPositionControl::calculate_gndspeed_undershoot(const Vector2f &curr_pos
          * not exceeded) travels towards a waypoint (and is not pushed more and more away
          * by wind). Not countering this would lead to a fly-away.
          */
+        if (_speed_type == 1)
+            ground_speed_desired = _parameters.airspeed_trim;
+
         _groundspeed_undershoot = max(ground_speed_desired - ground_speed_body, 0.0f);
 
     } else {
         _groundspeed_undershoot = 0.0f;
     }
+
 }
 
 void

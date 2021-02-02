@@ -293,6 +293,8 @@ private:
     float _airspeed{0.0f};
     float _eas2tas{1.0f};
 
+    int _speed_type{0};
+
     float _groundspeed_undershoot{0.0f};			///< ground speed error to min. speed in m/s
 
     Dcmf _R_nb;				///< current attitude
