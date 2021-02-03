@@ -2253,7 +2253,7 @@ public:
 		camera_status_msg.time_boot_ms = curr_cap.timestamp / 1000;
 		camera_status_msg.image_count = curr_cap.seq;
 
-		mavlink_msg_camera_image_captured_send_struct(_mavlink->get_channel(), &msg);
+		mavlink_msg_camera_capture_status_send_struct(_mavlink->get_channel(), &camera_status_msg);
 		return false;
 	}
 
