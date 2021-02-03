@@ -2203,6 +2203,106 @@ protected:
 	}
 };
 
+class MavlinkStreamCameraCaptureStatus : public MavlinkStream
+{
+public:
+	const char *get_name() const
+	{
+		return MavlinkStreamCameraCaptureStatus::get_name_static();
+	}
+
+	static const char *get_name_static()
+	{
+		return "CAMERA_CAPTURE_STATUS";
+	}
+
+	static uint16_t get_id_static()
+	{
+		return MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS;
+	}
+
+	uint16_t get_id()
+	{
+		return get_id_static();
+	}
+
+	bool const_rate()
+	{
+		return true;
+	}
+
+	static MavlinkStream *new_instance(Mavlink *mavlink)
+	{
+		return new MavlinkStreamCameraCaptureStatus(mavlink);
+	}
+
+	unsigned get_size()
+	{
+		return (_capture_time > 0) ? MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
+	}
+
+	bool request_message(float param2 = 0.0, float param3 = 0.0, float param4 = 0.0,
+				     float param5 = 0.0, float param6 = 0.0, float param7 = 0.0) override{
+		int id = param2;
+
+		struct camera_capture_s curr_cap;
+		orb_copy(ORB_ID(camera_capture), _capture_sub, &curr_cap);
+
+		mavlink_camera_capture_status_t camera_status_msg;
+		camera_status_msg.time_boot_ms = curr_cap.timestamp / 1000;
+		camera_status_msg. = curr_cap.seq;
+
+		mavlink_msg_camera_image_captured_send_struct(_mavlink->get_channel(), &msg);
+		return false;
+	}
+
+private:
+	MavlinkOrbSubscription *_capture_sub;
+	uint64_t _capture_time;
+
+	/* do not allow top copying this class */
+	MavlinkStreamCameraImageCaptured(MavlinkStreamCameraImageCaptured &) = delete;
+	MavlinkStreamCameraImageCaptured &operator = (const MavlinkStreamCameraImageCaptured &) = delete;
+
+protected:
+	explicit MavlinkStreamCameraImageCaptured(Mavlink *mavlink) : MavlinkStream(mavlink),
+		_capture_sub(_mavlink->add_orb_subscription(ORB_ID(camera_capture))),
+		_capture_time(0)
+	{}
+	int _camera_status_sub{orb_subscribe(ORB_ID(camera_log_file))};
+
+	bool send(const hrt_abstime t)
+	{
+		struct camera_capture_s capture;
+
+		if (_capture_sub->update(&_capture_time, &capture)) {
+
+			mavlink_camera_image_captured_t msg;
+
+			msg.time_boot_ms = capture.timestamp / 1000;
+			msg.time_utc = capture.timestamp_utc;
+			msg.camera_id = 1;	// FIXME : get this from uORB
+			msg.lat = capture.lat * 1e7;
+			msg.lon = capture.lon * 1e7;
+			msg.alt = capture.alt * 1e3f;
+			msg.relative_alt = capture.ground_distance * 1e3f;
+			msg.q[0] = capture.q[0];
+			msg.q[1] = capture.q[1];
+			msg.q[2] = capture.q[2];
+			msg.q[3] = capture.q[3];
+			msg.image_index = capture.seq;
+			msg.capture_result = capture.result;
+			msg.file_url[0] = '\0';
+
+			mavlink_msg_camera_image_captured_send_struct(_mavlink->get_channel(), &msg);
+
+			return true;
+		}
+
+		return false;
+	}
+};
+
 class MavlinkStreamGlobalPositionInt : public MavlinkStream
 {
 public:
