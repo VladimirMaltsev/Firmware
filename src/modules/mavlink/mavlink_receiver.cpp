@@ -708,6 +708,8 @@ uint8_t MavlinkReceiver::handle_request_message_command(uint16_t message_id, flo
 
 			if (message_id == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED){
 				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
+			} else if (message_id == MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS){
+				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
 			}
 			break;
 		}
