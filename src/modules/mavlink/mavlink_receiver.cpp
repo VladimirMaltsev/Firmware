@@ -470,7 +470,7 @@ template <class T>
 void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const T &cmd_mavlink,
 		const vehicle_command_s &vehicle_command)
 {
-	//mavlink_log_critical(&_mavlink_log_pub, "cmd = %d mess_id = %d, index = %d", cmd_mavlink.command, (uint16_t)roundf(vehicle_command.param1), (uint16_t)roundf(vehicle_command.param2));
+	mavlink_log_critical(&_mavlink_log_pub, "cmd = %d mess_id = %d, index = %d", cmd_mavlink.command, (uint16_t)roundf(vehicle_command.param1), (uint16_t)roundf(vehicle_command.param2));
 	bool target_ok = evaluate_target_ok(cmd_mavlink.command, cmd_mavlink.target_system, cmd_mavlink.target_component);
 
 	bool send_ack = true;
@@ -651,6 +651,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 		uint16_t message_id = (uint16_t)roundf(vehicle_command.param1);
 
 		mavlink_log_critical(&_mavlink_log_pub, "mess_id = %d, index = %d", message_id, vehicle_command.param2);
+
 		result = handle_request_message_command(message_id,
 							vehicle_command.param2, vehicle_command.param3, vehicle_command.param4,
 							vehicle_command.param5, vehicle_command.param6, vehicle_command.param7);
@@ -708,7 +709,9 @@ uint8_t MavlinkReceiver::handle_request_message_command(uint16_t message_id, flo
 
 			if (message_id == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED){
 				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
+				_mavlink->send_statustext_critical("MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED");
 			} else if (message_id == MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS){
+				_mavlink->send_statustext_critical("MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS");
 				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
 			}
 			break;
