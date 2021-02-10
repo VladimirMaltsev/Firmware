@@ -176,6 +176,7 @@ CameraCapture::publish_trigger()
 
 	if (!_first_skipped){
 		_first_skipped = true;
+		_capture_seq--;
 		return;
 	}
 
