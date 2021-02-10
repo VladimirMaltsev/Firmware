@@ -150,6 +150,8 @@ private:
 	hrt_abstime		_last_trig_time;
 	uint32_t 		_capture_overflows;
 
+	bool _first_skipped;
+
 	// Signal capture callback
 	void			capture_callback(uint32_t chan_index,
 			hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
