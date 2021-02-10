@@ -174,11 +174,11 @@ CameraCapture::publish_trigger()
 		return;
 	}
 
-	if (!_first_skipped){
-		_first_skipped = true;
-		_capture_seq--;
-		return;
-	}
+	// if (!_first_skipped){
+	// 	_first_skipped = true;
+	// 	_capture_seq--;
+	// 	return;
+	// }
 
 	if (_trigger_pub == nullptr) {
 
