@@ -54,7 +54,9 @@ fi
 #
 # This is the gimbal pass mixer.
 #
-#set MIXER_AUX pass
+set MIXER_AUX pass
+set PWM_AUX_RATE 50
 
-#set PWM_AUX_RATE 50
-#set PWM_AUX_OUT 1234
+set PWM_AUX_OUT 1234
+# set FMU_MODE gpio
+# set AUX_MODE gpio

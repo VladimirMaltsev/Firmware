@@ -284,7 +284,7 @@ CameraCapture::set_capture_control(bool enabled)
 	}
 
 	input_capture_config_t conf;
-	conf.channel = 1; //5; // FMU chan 6
+	conf.channel = 5; // FMU chan 6
 	conf.filter = 0;
 
 	if (_camera_capture_mode == 0) {
@@ -307,7 +307,7 @@ CameraCapture::set_capture_control(bool enabled)
 		if (::ioctl(fd, INPUT_CAP_GET_COUNT, (unsigned long)&capture_count) != 0) {
 			PX4_INFO("Not in a capture mode");
 
-			unsigned long mode = PWM_SERVO_MODE_6CAP; //PWM_SERVO_MODE_4PWM2CAP;
+			unsigned long mode = PWM_SERVO_MODE_4PWM2CAP;
 
 			if (::ioctl(fd, PWM_SERVO_SET_MODE, mode) == 0) {
 				PX4_INFO("Mode changed to 4PWM2CAP");
