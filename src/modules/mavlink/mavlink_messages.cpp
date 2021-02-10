@@ -2251,7 +2251,18 @@ public:
 
 		mavlink_camera_capture_status_t camera_status_msg;
 		camera_status_msg.time_boot_ms = curr_cap.timestamp / 1000;
-		camera_status_msg.image_count = curr_cap.seq;
+
+		if (_image_amount_zero) {
+			if (curr_cap.seq + 1 == 1){
+				_image_amount_zero = false;
+				camera_status_msg.image_count = curr_cap.seq + 1;
+			} else {
+				camera_status_msg.image_count = 0;
+			}
+		}
+		else{
+			camera_status_msg.image_count = curr_cap.seq + 1;
+		}
 
 		mavlink_msg_camera_capture_status_send_struct(_mavlink->get_channel(), &camera_status_msg);
 		return false;
@@ -2260,6 +2271,7 @@ public:
 private:
 	MavlinkOrbSubscription *_capture_sub;
 	uint64_t _capture_time;
+	bool _image_amount_zero;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCameraCaptureStatus(MavlinkStreamCameraCaptureStatus &) = delete;
@@ -2268,7 +2280,8 @@ private:
 protected:
 	explicit MavlinkStreamCameraCaptureStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_capture_sub(_mavlink->add_orb_subscription(ORB_ID(camera_capture))),
-		_capture_time(0)
+		_capture_time(0),
+		_image_amount_zero(true)
 	{}
 
 	bool send(const hrt_abstime t)
