@@ -58,6 +58,7 @@ CameraCapture::CameraCapture() :
 	_camera_capture_mode(0),
 	_camera_capture_edge(0),
 	_capture_seq(0),
+	_first_skipped(false),
 	_last_trig_begin_time(0),
 	_last_exposure_time(0),
 	_capture_overflows(0)
@@ -170,6 +171,11 @@ CameraCapture::publish_trigger()
 	_capture_overflows = _trigger.overflow;
 
 	if (!publish) {
+		return;
+	}
+
+	if (!_first_skipped){
+		_first_skipped = true;
 		return;
 	}
 

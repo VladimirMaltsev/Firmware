@@ -53,6 +53,7 @@ CameraFeedback::CameraFeedback() :
 	_trigger_sub(-1),
 	_gpos_sub(-1),
 	_time_sub(-1),
+	_ts_sub(-1),
 	_att_sub(-1),
 	_capture_pub(nullptr),
 	_camera_capture_feedback(false)

@@ -95,6 +95,7 @@ private:
 
 	int			_trigger_sub;
 	int 			_time_sub;
+	int 			_ts_sub;
 	int			_gpos_sub;
 	int			_att_sub;
 
