@@ -467,7 +467,15 @@ Navigator::run()
 				// CMD_MISSION_START is acknowledged by commander
 
 			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_CHANGE_SPEED) {
-				publish_speed_status();
+				if (_speed_status.speed_type != cmd.param1) {
+					_speed_status.speed_type = cmd.param1;
+					if (cmd.param1 == 0){
+						mavlink_log_critical(&_mavlink_log_pub, "[Mode] Airspeed");
+					} else {
+						mavlink_log_critical(&_mavlink_log_pub, "[Mode] Ground Speed");
+					}
+					publish_speed_status();
+				}
 
 				if (cmd.param2 > FLT_EPSILON) {
 					// XXX not differentiating ground and airspeed yet
