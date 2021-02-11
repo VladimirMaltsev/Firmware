@@ -440,6 +440,17 @@ FixedwingPositionControl::manual_control_setpoint_poll() {
 }
 
 void
+FixedwingPositionControl::speed_status_poll(){
+    bool status_updated;
+    orb_check(_speed_status_sub, &status_updated);
+
+    if (status_updated){
+        orb_copy(ORB_ID(speed_status), _speed_status_sub, &_speed_status);
+        _speed_type = _speed_status.speed_type;
+    }
+}
+
+void
 FixedwingPositionControl::airspeed_poll() {
     bool airspeed_valid = _airspeed_valid;
 
@@ -666,6 +677,9 @@ FixedwingPositionControl::calculate_gndspeed_undershoot(const Vector2f &curr_pos
          * not exceeded) travels towards a waypoint (and is not pushed more and more away
          * by wind). Not countering this would lead to a fly-away.
          */
+        if (_speed_type == 1)
+            ground_speed_desired = _parameters.airspeed_trim;
+
         _groundspeed_undershoot = max(ground_speed_desired - ground_speed_body, 0.0f);
 
     } else {
@@ -1993,6 +2007,7 @@ FixedwingPositionControl::run() {
     _vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
     _params_sub = orb_subscribe(ORB_ID(parameter_update));
     _manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
+    _speed_status_sub = orb_subscribe(ORB_ID(speed_status));
     _sensor_baro_sub = orb_subscribe(ORB_ID(sensor_baro));
     _engine_status_sub = orb_subscribe(ORB_ID(engine_status));
 
@@ -2073,6 +2088,7 @@ FixedwingPositionControl::run() {
 
             _sub_sensors.update();
             airspeed_poll();
+            speed_status_poll();
             manual_control_setpoint_poll();
             position_setpoint_triplet_poll();
             vehicle_attitude_poll();

@@ -86,6 +86,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/engine_status.h>
 #include <uORB/topics/stg_status.h>
+#include <uORB/topics/speed_status.h>
 #include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
@@ -201,6 +202,7 @@ private:
     int		_manual_control_sub{-1};		///< notification of manual control updates */
     int		_sensor_baro_sub{-1};
     int         _engine_status_sub{-1};
+    int         _speed_status_sub{-1};
 
     const int idle_rpm = 3800;
     hrt_abstime last_time_correct_idle_throttle{0};
@@ -219,6 +221,7 @@ private:
 
     orb_id_t _attitude_setpoint_id{nullptr};
 
+    speed_status_s              _speed_status{};
     manual_control_setpoint_s	_manual {};			///< r/c channel data */
     position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items */
     vehicle_attitude_s	_att {};			///< vehicle attitude setpoint */
@@ -300,6 +303,7 @@ private:
     hrt_abstime _airspeed_last_valid{0};			///< last time airspeed was received. Used to detect timeouts.
     float _airspeed{0.0f};
     float _eas2tas{1.0f};
+    int _speed_type{0};
 
     float _groundspeed_undershoot{0.0f};			///< ground speed error to min. speed in m/s
 
@@ -476,6 +480,7 @@ private:
     void		vehicle_control_mode_poll();
     void		vehicle_land_detected_poll();
     void		vehicle_status_poll();
+    void                speed_status_poll();
 
     void		status_publish();
     void		landing_status_publish();
