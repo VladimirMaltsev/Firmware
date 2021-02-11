@@ -113,7 +113,6 @@
 using matrix::wrap_2pi;
 
 static uint16_t cm_uint16_from_m_float(float m);
-static uint8_t image_count = 0;
 
 static void get_mavlink_mode_state(const struct vehicle_status_s *const status, uint8_t *mavlink_state,
 				   uint8_t *mavlink_base_mode, uint32_t *mavlink_custom_mode);
@@ -2177,8 +2176,6 @@ protected:
 		struct camera_capture_s capture;
 
 		if (_capture_sub->update(&_capture_time, &capture)) {
-			image_count = 1;
-
 			mavlink_camera_image_captured_t msg;
 
 			msg.time_boot_ms = capture.timestamp / 1000;
