@@ -337,7 +337,7 @@ MissionBlock::is_mission_item_reached()
 					_waypoint_position_reached = true;
 				}
 			} else if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION && !_needing_loiter && dist_xy >= 0.0f && dist_xy <= mission_acceptance_radius) {
-				mavlink_log_critical(&_mavlink_log_pub, "rad = %f", mission_acceptance_radius);
+				//mavlink_log_critical(&_mavlink_log_pub, "rad = %f", mission_acceptance_radius);
 				_waypoint_position_reached = true;
 			} else if (!_needing_loiter && dist_xy >= 0.0f && dist_xy <= _navigator->get_loiter_radius() / 2.f) {
 				_waypoint_position_reached = true;

@@ -487,7 +487,8 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     const float max_pitch(fabsf(math::radians(max_pitch_deg)));
 
     if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
-        mavlink_log_critical(&_mavlink_log_pub, "HA: p_m=%.3f p=%.3f | r_m=%.3f r = %.3f", max_pitch, _pitch, max_roll, _roll);
+        if (!unexpected_descent)
+            mavlink_log_critical(&_mavlink_log_pub, "RISKILY: p_m=%.3f p=%.3f r_m=%.3f r = %.3f", max_pitch, _pitch, max_roll, _roll);
 
         //if previous unsafe situations occured more than 10s ago then reset timer
         if (detecting_pr_failsafe && hrt_elapsed_time(&pr_time_fsafe) > 5e6){
@@ -1340,7 +1341,10 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
             }
 
             if (_vehicle_land_detected.landed){
-                mavlink_log_critical(&_mavlink_log_pub, "Virtual drop");
+
+                if (_control_mode.flag_armed)
+                    mavlink_log_critical(&_mavlink_log_pub, "Virtual drop");
+
                 play_tune(11);
                 set_mode();
                 set_arm(false);
@@ -1622,7 +1626,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             //_att_sp.yaw_reset_integral = true;
 
         } else {
-            mavlink_log_critical(&_mavlink_log_pub, "climbout completed");
+            if (!climbout_completed)
+                mavlink_log_critical(&_mavlink_log_pub, "climbout completed");
+
             climbout_completed = true;
 
             _l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
