@@ -72,6 +72,7 @@
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/speed_status.h>
 #include <uORB/uORB.h>
 
 /**
@@ -116,6 +117,8 @@ public:
 	 * Publish the geofence result
 	 */
 	void		publish_geofence_result();
+
+	void 		publish_speed_status();
 
 	void		publish_vehicle_cmd(vehicle_command_s *vcmd);
 
@@ -331,6 +334,7 @@ private:
 	orb_advert_t	_vehicle_cmd_ack_pub{nullptr};
 	orb_advert_t	_vehicle_cmd_pub{nullptr};
 	orb_advert_t	_vehicle_roi_pub{nullptr};
+	orb_advert_t 	_speed_status_pub{nullptr};
 
 	// Subscriptions
 	home_position_s					_home_pos{};		/**< home position for RTL */
@@ -346,6 +350,7 @@ private:
 	uint8_t						_previous_nav_state{}; /**< nav_state of the previous iteration*/
 
 	// Publications
+	speed_status_s					_speed_status;
 	geofence_result_s				_geofence_result{};
 	position_setpoint_triplet_s			_pos_sp_triplet{};	/**< triplet of position setpoints */
 	position_setpoint_triplet_s			_reposition_triplet{};	/**< triplet for non-mission direct position command */

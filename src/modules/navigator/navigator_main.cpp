@@ -467,6 +467,8 @@ Navigator::run()
 				// CMD_MISSION_START is acknowledged by commander
 
 			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_CHANGE_SPEED) {
+				publish_speed_status();
+
 				if (cmd.param2 > FLT_EPSILON) {
 					// XXX not differentiating ground and airspeed yet
 					set_cruising_speed(cmd.param2);
@@ -1276,6 +1278,18 @@ Navigator::publish_geofence_result()
 		/* advertise and publish */
 		_geofence_result_pub = orb_advertise(ORB_ID(geofence_result), &_geofence_result);
 	}
+}
+
+void
+Navigator::publish_speed_status()
+{
+	if (_speed_status_pub != nullptr){
+		orb_publish(ORB_ID(speed_status), _speed_status_pub, &_speed_status);
+	}else
+	{
+		_speed_status_pub = orb_advertise(ORB_ID(speed_status), &_speed_status);
+	}
+
 }
 
 void
