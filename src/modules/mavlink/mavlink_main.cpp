@@ -1652,7 +1652,8 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("ALTITUDE", 1.0f);
 		configure_stream_local("ATTITUDE", 20.0f);
 		configure_stream_local("ATTITUDE_TARGET", 2.0f);
-		configure_stream_local("CAMERA_IMAGE_CAPTURED", unlimited_rate);
+		configure_stream_local("CAMERA_IMAGE_CAPTURED", 2.0f);
+		configure_stream_local("CAMERA_CAPTURE_STATUS", 2.0f);
 		configure_stream_local("COLLISION", unlimited_rate);
 		configure_stream_local("DEBUG", 1.0f);
 		configure_stream_local("DEBUG_FLOAT_ARRAY", 1.0f);

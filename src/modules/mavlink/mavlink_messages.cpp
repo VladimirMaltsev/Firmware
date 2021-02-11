@@ -2205,6 +2205,88 @@ protected:
 	}
 };
 
+class MavlinkStreamCameraCaptureStatus : public MavlinkStream
+{
+public:
+	const char *get_name() const
+	{
+		return MavlinkStreamCameraCaptureStatus::get_name_static();
+	}
+
+	static const char *get_name_static()
+	{
+		return "CAMERA_CAPTURE_STATUS";
+	}
+
+	static uint16_t get_id_static()
+	{
+		return MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS;
+	}
+
+	uint16_t get_id()
+	{
+		return get_id_static();
+	}
+
+	bool const_rate()
+	{
+		return true;
+	}
+
+	static MavlinkStream *new_instance(Mavlink *mavlink)
+	{
+		return new MavlinkStreamCameraCaptureStatus(mavlink);
+	}
+
+	unsigned get_size()
+	{
+		return (_capture_time > 0) ? MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
+	}
+
+	bool request_message(float param2 = 0.0, float param3 = 0.0, float param4 = 0.0,
+				     float param5 = 0.0, float param6 = 0.0, float param7 = 0.0) override{
+		int id = param2;
+
+		//orb_copy(ORB_ID(camera_capture), _capture_sub, &curr_cap);
+		if(_capture_sub->update(&_capture_time, &curr_cap)){
+			_image_n = curr_cap.seq + 1;
+		}
+
+		mavlink_camera_capture_status_t camera_status_msg;
+		camera_status_msg.time_boot_ms = curr_cap.timestamp / 1000;
+
+		camera_status_msg.time_boot_ms = curr_cap.timestamp;
+		camera_status_msg.image_count = _image_n;
+
+		mavlink_msg_camera_capture_status_send_struct(_mavlink->get_channel(), &camera_status_msg);
+		return false;
+	}
+
+private:
+	MavlinkOrbSubscription *_capture_sub;
+	uint64_t _capture_time;
+	bool _image_amount_zero;
+	int32_t _image_n;
+	struct camera_capture_s curr_cap;
+
+	/* do not allow top copying this class */
+	MavlinkStreamCameraCaptureStatus(MavlinkStreamCameraCaptureStatus &) = delete;
+	MavlinkStreamCameraCaptureStatus &operator = (const MavlinkStreamCameraCaptureStatus &) = delete;
+
+protected:
+	explicit MavlinkStreamCameraCaptureStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
+		_capture_sub(_mavlink->add_orb_subscription(ORB_ID(camera_capture))),
+		_capture_time(0),
+		_image_n(0),
+		_image_amount_zero(true)
+	{}
+
+	bool send(const hrt_abstime t)
+	{
+		return false;
+	}
+};
+
 class MavlinkStreamGlobalPositionInt : public MavlinkStream
 {
 public:
@@ -5102,6 +5184,7 @@ static const StreamListItem streams_list[] = {
 	StreamListItem(&MavlinkStreamCameraCapture::new_instance, &MavlinkStreamCameraCapture::get_name_static, &MavlinkStreamCameraCapture::get_id_static),
 	StreamListItem(&MavlinkStreamCameraTrigger::new_instance, &MavlinkStreamCameraTrigger::get_name_static, &MavlinkStreamCameraTrigger::get_id_static),
 	StreamListItem(&MavlinkStreamCameraImageCaptured::new_instance, &MavlinkStreamCameraImageCaptured::get_name_static, &MavlinkStreamCameraImageCaptured::get_id_static),
+	StreamListItem(&MavlinkStreamCameraCaptureStatus::new_instance, &MavlinkStreamCameraCaptureStatus::get_name_static, &MavlinkStreamCameraCaptureStatus::get_id_static),
 	StreamListItem(&MavlinkStreamDistanceSensor::new_instance, &MavlinkStreamDistanceSensor::get_name_static, &MavlinkStreamDistanceSensor::get_id_static),
 	StreamListItem(&MavlinkStreamExtendedSysState::new_instance, &MavlinkStreamExtendedSysState::get_name_static, &MavlinkStreamExtendedSysState::get_id_static),
 	StreamListItem(&MavlinkStreamAltitude::new_instance, &MavlinkStreamAltitude::get_name_static, &MavlinkStreamAltitude::get_id_static),
