@@ -791,10 +791,13 @@ uint8_t MavlinkReceiver::handle_request_message_command(uint16_t message_id, flo
 {
 	for (const auto &stream : _mavlink->get_streams()) {
 		if (stream->get_id() == message_id) {
+			bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
 
-			if (message_id == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED){
-				bool message_sent = stream->request_message(param2, param3, param4, param5, param6, param7);
-			}
+			// if (message_id == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED){
+			// 	_mavlink->send_statustext_critical("MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED");
+			// } else if (message_id == MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS){
+			// 	_mavlink->send_statustext_critical("MAVLINK_MSG_ID_CAMERA_CAPTURE_STATUS");
+			// }
 			break;
 		}
 	}
