@@ -113,6 +113,7 @@
 using matrix::wrap_2pi;
 
 static uint16_t cm_uint16_from_m_float(float m);
+static uint8_t image_count = 0;
 
 static void get_mavlink_mode_state(const struct vehicle_status_s *const status, uint8_t *mavlink_state,
 				   uint8_t *mavlink_base_mode, uint32_t *mavlink_custom_mode);
@@ -2176,6 +2177,7 @@ protected:
 		struct camera_capture_s capture;
 
 		if (_capture_sub->update(&_capture_time, &capture)) {
+			image_count = 1;
 
 			mavlink_camera_image_captured_t msg;
 
@@ -2245,24 +2247,16 @@ public:
 				     float param5 = 0.0, float param6 = 0.0, float param7 = 0.0) override{
 		int id = param2;
 
-		struct camera_capture_s curr_cap;
 		//orb_copy(ORB_ID(camera_capture), _capture_sub, &curr_cap);
-		_capture_sub->update(&_capture_time, &curr_cap);
+		if(_capture_sub->update(&_capture_time, &curr_cap)){
+			_image_n = curr_cap.seq + 1;
+		}
 
 		mavlink_camera_capture_status_t camera_status_msg;
 		camera_status_msg.time_boot_ms = curr_cap.timestamp / 1000;
 
-		if (_image_amount_zero) {
-			if (curr_cap.seq + 1 == 1){
-				_image_amount_zero = false;
-				camera_status_msg.image_count = curr_cap.seq + 1;
-			} else {
-				camera_status_msg.image_count = 0;
-			}
-		}
-		else{
-			camera_status_msg.image_count = curr_cap.seq + 1;
-		}
+		camera_status_msg.time_boot_ms = curr_cap.timestamp;
+		camera_status_msg.image_count = _image_n;
 
 		mavlink_msg_camera_capture_status_send_struct(_mavlink->get_channel(), &camera_status_msg);
 		return false;
@@ -2272,6 +2266,8 @@ private:
 	MavlinkOrbSubscription *_capture_sub;
 	uint64_t _capture_time;
 	bool _image_amount_zero;
+	int32_t _image_n;
+	struct camera_capture_s curr_cap;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCameraCaptureStatus(MavlinkStreamCameraCaptureStatus &) = delete;
@@ -2281,6 +2277,7 @@ protected:
 	explicit MavlinkStreamCameraCaptureStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_capture_sub(_mavlink->add_orb_subscription(ORB_ID(camera_capture))),
 		_capture_time(0),
+		_image_n(0),
 		_image_amount_zero(true)
 	{}
 
