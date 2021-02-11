@@ -467,7 +467,7 @@ FixedwingPositionControl::airspeed_poll() {
 
             if (climbout_completed && (_airspeed > (_parameters.airspeed_max + 5.f) || _airspeed < (_parameters.airspeed_min - 3.f))){
                 if (hrt_elapsed_time(&_airspeed_last_valid) > 1_s) {
-                    airspeed_valid = false;
+                   _speed_type = 1;
                     mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Invalid airspeed = %.2f", _airspeed);
                 }
             }else {
@@ -677,10 +677,12 @@ FixedwingPositionControl::calculate_gndspeed_undershoot(const Vector2f &curr_pos
          * not exceeded) travels towards a waypoint (and is not pushed more and more away
          * by wind). Not countering this would lead to a fly-away.
          */
-        if (_speed_type == 1)
+        if (_speed_type == 1) {
             ground_speed_desired = _parameters.airspeed_trim;
-
-        _groundspeed_undershoot = max(ground_speed_desired - ground_speed_body, 0.0f);
+            _groundspeed_undershoot = ground_speed_desired - ground_speed_body;
+        } else {
+            _groundspeed_undershoot = max(ground_speed_desired - ground_speed_body, 0.0f);
+        }
 
     } else {
         _groundspeed_undershoot = 0.0f;
@@ -1077,8 +1079,6 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
             mission_airspeed = pos_sp_curr.cruising_speed;
             _parameters.airspeed_trim = mission_airspeed;
-            _parameters.airspeed_max = mission_airspeed + 9.f;
-            _parameters.airspeed_min = mission_airspeed - 3.f;
         }
 
         float mission_throttle = _parameters.throttle_cruise;
