@@ -291,6 +291,7 @@ private:
 
     hrt_abstime _engine_restart_thr_delay{0};
     bool enable_engine_restart{false};
+    bool engine_on{false};
     bool is_landing{false};
     bool climbout_completed{false};
 

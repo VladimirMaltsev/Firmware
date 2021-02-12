@@ -467,8 +467,9 @@ FixedwingPositionControl::airspeed_poll() {
 
             if (climbout_completed && (_airspeed > (_parameters.airspeed_max + 5.f) || _airspeed < (_parameters.airspeed_min - 3.f))){
                 if (hrt_elapsed_time(&_airspeed_last_valid) > 1_s) {
-                   _speed_type = 1;
-                    mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Invalid airspeed = %.2f", _airspeed);
+                    _speed_type = 1;
+                    if (_airspeed > 10.f)
+                        mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Invalid airspeed = %.2f", _airspeed);
                 }
             }else {
                 _airspeed_last_valid = as.timestamp;
@@ -550,7 +551,9 @@ FixedwingPositionControl::vehicle_attitude_poll() {
     const float max_pitch(fabsf(math::radians(max_pitch_deg)));
 
     if (_control_mode.flag_armed && (((max_roll > 0.0f) && (fabsf(_roll) > max_roll)) || ((max_pitch > 0.0f) && (fabsf(_pitch) > max_pitch)))){
-        mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Pitch=%.3f Roll=%.3f", _pitch, _roll);
+
+        if (!unexpected_descent)
+            mavlink_log_critical(&_mavlink_log_pub, " [Failsafe] Pitch=%.3f Roll=%.3f", _pitch, _roll);
 
         //if previous unsafe situations occured more than 10s ago then reset timer
         if (detecting_pr_failsafe && hrt_elapsed_time(&pr_time_fsafe) > 5e6){
@@ -1521,7 +1524,10 @@ FixedwingPositionControl::bano_enable(bool enable){
 void FixedwingPositionControl::engine_enable(bool enable){
 
     if (enable){
-        mavlink_log_critical(&_mavlink_log_pub, " [Engine] ON");
+        if (!engine_on){
+            engine_on = true;
+            mavlink_log_critical(&_mavlink_log_pub, " [Engine] ON");
+        }
         vehicle_command_s vcmd_engine_off = {};
         vcmd_engine_off.timestamp = hrt_absolute_time();
         vcmd_engine_off.command = 27601;
@@ -1535,7 +1541,10 @@ void FixedwingPositionControl::engine_enable(bool enable){
 
         orb_advertise_queue(ORB_ID(vehicle_command), &vcmd_engine_off, vehicle_command_s::ORB_QUEUE_LENGTH);
     }else {
-        mavlink_log_critical(&_mavlink_log_pub, " [Engine] OFF");
+        if (engine_on){
+            engine_on = false;
+            mavlink_log_critical(&_mavlink_log_pub, " [Engine] OFF");
+        }
         vehicle_command_s vcmd_engine_off = {};
         vcmd_engine_off.timestamp = hrt_absolute_time();
         vcmd_engine_off.command = 27601;
@@ -1750,8 +1759,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
             if (!fixed_takeoff_line) {
                 fixed_takeoff_line = true;
                 // create virtual waypoint in 500m ahead before takeoff
-                Eulerf euler(Quatf(_att.q));
-                get_waypoint_heading_distance(euler.psi(), _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+                get_waypoint_heading_distance(_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
                 prev_wp_takeoff(0) = (float) _hdg_hold_prev_wp.lat;
                 prev_wp_takeoff(1) = (float) _hdg_hold_prev_wp.lon;
                 curr_wp_takeoff(0) = (float) _hdg_hold_curr_wp.lat;

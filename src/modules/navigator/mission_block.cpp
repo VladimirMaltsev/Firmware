@@ -179,7 +179,7 @@ MissionBlock::is_mission_item_reached()
 			}
 
 			if (dist_xy < _navigator->get_loiter_radius()/2.f && _needing_loiter && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
-				mavlink_log_critical(&_mavlink_log_pub, "dist = rad/2, switch to loiter");
+				//mavlink_log_critical(&_mavlink_log_pub, "dist = rad/2, switch to loiter");
 				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 				curr_sp->loiter_radius = _navigator->get_loiter_radius();
 				curr_sp->loiter_direction = _loiter_direction;
@@ -393,7 +393,7 @@ MissionBlock::is_mission_item_reached()
 
 			/* accept yaw if reached or if timeout is set in which case we ignore not forced headings */
 			if (_loiter_direction * yaw_err < 0 && fabsf(yaw_err) < _navigator->get_yaw_threshold()) {
-				mavlink_log_critical(&_mavlink_log_pub, "switch back");
+				//mavlink_log_critical(&_mavlink_log_pub, "switch back");
 				_mission_item.yaw += math::radians(180.f);
 				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 				curr_sp->lat = _mission_item.lat;
