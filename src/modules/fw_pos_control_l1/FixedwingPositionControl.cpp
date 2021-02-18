@@ -1764,8 +1764,9 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
                 prev_wp_takeoff(1) = (float) _hdg_hold_prev_wp.lon;
                 curr_wp_takeoff(0) = (float) _hdg_hold_curr_wp.lat;
                 curr_wp_takeoff(1) = (float) _hdg_hold_curr_wp.lon;
+                Eulerf euler(Quatf(_att.q));
                 mavlink_log_critical(&_mavlink_log_pub, " [Takeoff] virt_p1: lat1=%.8f lat2=%.8f", (float) _hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon);
-                mavlink_log_critical(&_mavlink_log_pub, " [Takeoff] virt_p2: lat1=%.8f lat2=%.8f", (float) _hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon);
+                mavlink_log_critical(&_mavlink_log_pub, "[T] yaw=%.3f, pci=%.3f, p2: %.8f, %.8f; %.8f, %.8f", _yaw, euler.psi(), (float) _hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon, (float)_hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon);
                 _takeoff_ground_alt = _global_pos.alt;
             }
 
