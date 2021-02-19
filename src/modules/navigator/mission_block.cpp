@@ -133,7 +133,7 @@ MissionBlock::is_mission_item_reached()
 	hrt_abstime now = hrt_absolute_time();
 
 	if (!_navigator->get_land_detected()->landed && !_waypoint_position_reached) {
-		struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
+		struct position_setpoint_s *curr_sp1 = &_navigator->get_position_setpoint_triplet()->current;
 
 		float dist = -1.0f;
 		float dist_xy = -1.0f;
@@ -141,58 +141,119 @@ MissionBlock::is_mission_item_reached()
 
 		float altitude_amsl = _mission_item.altitude_is_relative ? _mission_item.altitude + _navigator->get_home_position()->alt : _mission_item.altitude;
 
-		dist = get_distance_to_point_global_wgs84(curr_sp->lat, curr_sp->lon, altitude_amsl, _navigator->get_global_position()->lat,
+		dist = get_distance_to_point_global_wgs84(curr_sp1->lat, curr_sp1->lon, altitude_amsl, _navigator->get_global_position()->lat,
 							_navigator->get_global_position()->lon, _navigator->get_global_position()->alt,
 							&dist_xy, &dist_z);
 
 		/* FW special case for NAV_CMD_WAYPOINT to achieve altitude via loiter */
 		if (!_navigator->get_vstatus()->is_rotary_wing && (_mission_item.nav_cmd == NAV_CMD_WAYPOINT)) {
 
-			if (!_curr_checked && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+			struct position_setpoint_s *prev_sp = &_navigator->get_position_setpoint_triplet()->previous;
+			struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
+
+			if (!_curr_checked && curr_sp1->type == position_setpoint_s::SETPOINT_TYPE_POSITION && prev_sp->valid) {
 
 				_curr_checked = true;
-				struct position_setpoint_s *prev_sp = &_navigator->get_position_setpoint_triplet()->previous;
+
 
 				//param1 of NAV_CMD_WAPOINT is using for loiter indicator due to the fact that it is unused for fixed wing
 				//so loiter is needed if
-				//			1. param1 (hold or time_inside) eq
-				//			2. altitude difference > altitude acceptance radius
-				if (prev_sp->valid && (_mission_item.time_inside > 0.5f || fabs(altitude_amsl - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){
+				//	1. param1 (hold or time_inside) eq
+				//	2. altitude difference > altitude acceptance radius
+				if ((_mission_item.time_inside > 0.5f &&  _mission_item.time_inside < 1.5f) || (prev_sp->valid && fabs(altitude_amsl - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){ //Rotation around point
+
 					_needing_loiter = true;
 
-					struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
+					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp1->lat, curr_sp1->lon);
+					float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp1->lat, curr_sp1->lon, next_sp->lat, next_sp->lon);
 
-					//mavlink_log_critical(&_mavlink_log_pub, "dist=%f dist_xy=%f", dist, dist_xy);
-					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp->lat, curr_sp->lon);
-					float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp->lat, curr_sp->lon, next_sp->lat, next_sp->lon);
+					_rotation_angle = wrap_pi(curr_next_bearing - prev_curr_bearing);
+					_loiter_direction = (_rotation_angle >= _loiter_threshold && _rotation_angle <= M_PI_F) ? -1 : 1;
 
-					float angle = wrap_pi(curr_next_bearing - prev_curr_bearing);
-					_loiter_direction = (angle >= _loiter_threshold && angle <= M_PI_F) ? -1 : 1;
-					waypoint_from_heading_and_distance(curr_sp->lat, curr_sp->lon,
-								prev_curr_bearing, _navigator->get_loiter_radius() / 2.f,
-								&curr_sp->lat, &curr_sp->lon);
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon,
+								prev_curr_bearing, 20.f,
+								&curr_sp1->lat, &curr_sp1->lon);
 
-					// _mission_item.lat = curr_sp->lat;
-					// _mission_item.lon = curr_sp->lon;
+					_navigator->set_position_setpoint_triplet_updated();
+
+				}else if (_mission_item.time_inside > 1.5f && _mission_item.time_inside < 2.5f){ //Tack enter
+					_after_loiter = true;
+
+				}else if (_mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f){ //Tack exit
+					_needing_loiter = true;
+
+					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp1->lat, curr_sp1->lon);
+					float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp1->lat, curr_sp1->lon, next_sp->lat, next_sp->lon);
+
+					_spec_tack = _navigator->get_loiter_radius() > get_distance_to_next_waypoint(curr_sp1->lat, curr_sp1->lon, prev_sp->lat, prev_sp->lon);
+
+					float next_curr_bearing = get_bearing_to_next_waypoint(next_sp->lat, next_sp->lon, curr_sp1->lat, curr_sp1->lon);
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon,
+								next_curr_bearing, _navigator->get_loiter_radius() / 3.f,
+								&curr_sp1->lat, &curr_sp1->lon);
+
+
+
+					_rotation_angle = wrap_pi(curr_next_bearing - prev_curr_bearing);
+					_loiter_direction = (_rotation_angle >= _loiter_threshold && _rotation_angle <= M_PI_F) ? 1 : -1;
+
+					float perpend_angle = wrap_pi(curr_next_bearing + _loiter_direction * M_PI_2_F);
+					waypoint_from_heading_and_distance(curr_sp1->lat, curr_sp1->lon,
+								perpend_angle, _navigator->get_loiter_radius(),
+								&curr_sp1->lat, &curr_sp1->lon);
+
 					_navigator->set_position_setpoint_triplet_updated();
 				}
+
+
 			}
 
-			if (dist_xy < _navigator->get_loiter_radius()/2.f && _needing_loiter && curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
-				mavlink_log_critical(&_mavlink_log_pub, "switch to loiter");
-				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
-				curr_sp->loiter_radius = _navigator->get_loiter_radius();
-				curr_sp->loiter_direction = _loiter_direction;
+			if (_needing_loiter && curr_sp1->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
+				if (dist_xy < 20.f && _mission_item.time_inside > 0.5f &&  _mission_item.time_inside < 1.5f){ //Rotation around point
 
-				struct position_setpoint_s *next_sp = &_navigator->get_position_setpoint_triplet()->next;
-				_mission_item.yaw  = get_bearing_to_next_waypoint(next_sp->lat, next_sp->lon, curr_sp->lat, curr_sp->lon);
+					curr_sp1->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
+					curr_sp1->loiter_radius = _navigator->get_loiter_radius();
+					curr_sp1->loiter_direction = _loiter_direction;
+					_after_loiter = true;
 
-				waypoint_from_heading_and_distance(curr_sp->lat, curr_sp->lon, _mission_item.yaw, _navigator->get_loiter_radius(), &curr_sp->lat, &curr_sp->lon);
+					double temp_lat = 1.f;
+					double temp_lon = 1.f;
 
-				// _mission_item.lat = curr_sp->lat;
-				// _mission_item.lon = curr_sp->lon;
+					_mission_item.yaw  = get_bearing_to_next_waypoint(_mission_item.lat, _mission_item.lon, next_sp->lat, next_sp->lon);
+					float perpend_angle = wrap_pi(_mission_item.yaw + _loiter_direction * M_PI_2_F);
 
-				_navigator->set_position_setpoint_triplet_updated();
+					float padding = (fabsf(_rotation_angle) > M_PI_2_F) ? _navigator->get_loiter_radius() * fabsf(_rotation_angle /2.f)  : 20.f;
+
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &temp_lat, &temp_lon);
+					waypoint_from_heading_and_distance(temp_lat, temp_lon, perpend_angle, _navigator->get_loiter_radius() - 20.f, &curr_sp1->lat, &curr_sp1->lon);
+
+					_navigator->set_position_setpoint_triplet_updated();
+
+				}else if (_mission_item.time_inside > 1.5f && _mission_item.time_inside < 2.5f){ //Tack enter
+					_after_loiter = true;
+
+				}else if ((!_spec_tack || dist_xy < 30.f) && _mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f){ //Tack exit
+
+					curr_sp1->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
+					curr_sp1->loiter_radius = _navigator->get_loiter_radius();
+					curr_sp1->loiter_direction = _loiter_direction;
+					_after_loiter = true;
+
+					double temp_lat = 1.f;
+					double temp_lon = 1.f;
+
+					_mission_item.yaw  = get_bearing_to_next_waypoint(_mission_item.lat, _mission_item.lon, next_sp->lat, next_sp->lon);
+					float perpend_angle = wrap_pi(_mission_item.yaw + _loiter_direction * M_PI_2_F);
+
+					float padding = _navigator->get_loiter_radius() / 3.f;
+
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &temp_lat, &temp_lon);
+					waypoint_from_heading_and_distance(temp_lat, temp_lon, perpend_angle, _navigator->get_loiter_radius() - 20.f, &curr_sp1->lat, &curr_sp1->lon);
+
+					_navigator->set_position_setpoint_triplet_updated();
+				}
+
+
 			}
 		}
 
@@ -331,6 +392,8 @@ MissionBlock::is_mission_item_reached()
 			struct position_setpoint_s *prev_sp = &_navigator->get_position_setpoint_triplet()->previous;
 
 			float radius = 1.2f *_navigator->get_loiter_radius();
+			if (_after_loiter)
+				mission_acceptance_radius = 10.f;
 
 			if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
 				if (dist >= 0.0f && dist <= radius && dist_z <= _navigator->get_altitude_acceptance_radius() / 2.f) {
@@ -388,18 +451,19 @@ MissionBlock::is_mission_item_reached()
 					    _navigator->get_local_position()->vy,
 					    _navigator->get_local_position()->vx
 				    );
-
+			//_mission_item.yaw = get_bearing_to_next_waypoint(_mission_item.lat, _mission_item.lon, next_sp->lat, next_sp->lon);
 			float yaw_err = wrap_pi(_mission_item.yaw - cog);
 
 			/* accept yaw if reached or if timeout is set in which case we ignore not forced headings */
-			if (_loiter_direction * yaw_err < 0 && fabsf(yaw_err) < _navigator->get_yaw_threshold()) {
-				mavlink_log_critical(&_mavlink_log_pub, "switch back");
-				_mission_item.yaw += math::radians(180.f);
+			if (((_mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f && _loiter_direction * yaw_err > 0) || (_mission_item.time_inside > 0.5f && _mission_item.time_inside < 1.5f && _loiter_direction * yaw_err > 0)) && fabsf(yaw_err /*+ _loiter_direction * math::radians(85.f)*/) < _navigator->get_yaw_threshold()) {
+				//mavlink_log_critical(&_mavlink_log_pub, "switch back");
+				//_mission_item.yaw += math::radians(180.f);
 				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 				curr_sp->lat = _mission_item.lat;
 				curr_sp->lon = _mission_item.lon;
 				_needing_loiter = false;
-
+				//mavlink_log_critical(&_mavlink_log_pub, "switch to position");
+				_navigator->set_position_setpoint_triplet_updated();
 				//_waypoint_yaw_reached = true;
 			}
 		}else {
