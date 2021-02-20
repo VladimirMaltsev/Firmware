@@ -211,6 +211,14 @@ MissionBlock::is_mission_item_reached()
 			if (_needing_loiter && curr_sp1->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
 				if (dist_xy < 20.f && _mission_item.time_inside > 0.5f &&  _mission_item.time_inside < 1.5f){ //Rotation around point
 
+					// Disable camera trigger
+					vehicle_command_s cmd = {};
+					cmd.command = vehicle_command_s::VEHICLE_CMD_DO_TRIGGER_CONTROL;
+					// Pause trigger
+					cmd.param1 = -1.0f;
+					cmd.param3 = 1.0f;
+					_navigator->publish_vehicle_cmd(&cmd);
+
 					curr_sp1->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 					curr_sp1->loiter_radius = _navigator->get_loiter_radius();
 					curr_sp1->loiter_direction = _loiter_direction;
@@ -467,22 +475,16 @@ MissionBlock::is_mission_item_reached()
 				//_waypoint_yaw_reached = true;
 			}
 		}else {
+			if (_mission_item.time_inside > 0.5f && _mission_item.time_inside < 1.5f && _after_loiter){
+					// unpause triggering if it was paused
+					vehicle_command_s cmd = {};
+					cmd.command = vehicle_command_s::VEHICLE_CMD_DO_TRIGGER_CONTROL;
+					// unpause trigger
+					cmd.param1 = -1.0f;
+					cmd.param3 = 0.0f;
+					_navigator->publish_vehicle_cmd(&cmd);
+			}
 			_waypoint_yaw_reached = true;
-			// if (!_needing_loiter) {
-			// 	_waypoint_yaw_reached = true;
-			// }else{
-			// 	_needing_loiter = false;
-			// 	float cog = atan2f(
-			// 		    _navigator->get_local_position()->vy,
-			// 		    _navigator->get_local_position()->vx
-			// 	    );
-
-			// 	float yaw_err = wrap_pi(_mission_item.yaw - cog);
-			// 	if (loiter_direction * yaw_err < 0 && fabsf(yaw_err) < _navigator->get_yaw_threshold()) {
-			// 		mavlink_log_critical(&_mavlink_log_pub, "Achieved");
-			// 		_waypoint_yaw_reached = true;
-			// 	}
-			// }
 		}
 	}
 
