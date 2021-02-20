@@ -189,7 +189,7 @@ MissionBlock::is_mission_item_reached()
 
 					float next_curr_bearing = get_bearing_to_next_waypoint(next_sp->lat, next_sp->lon, curr_sp1->lat, curr_sp1->lon);
 					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon,
-								next_curr_bearing, _navigator->get_loiter_radius() / 3.f,
+								next_curr_bearing, _navigator->get_loiter_radius() / 2.f,
 								&curr_sp1->lat, &curr_sp1->lon);
 
 
@@ -245,10 +245,10 @@ MissionBlock::is_mission_item_reached()
 					_mission_item.yaw  = get_bearing_to_next_waypoint(_mission_item.lat, _mission_item.lon, next_sp->lat, next_sp->lon);
 					float perpend_angle = wrap_pi(_mission_item.yaw + _loiter_direction * M_PI_2_F);
 
-					float padding = _navigator->get_loiter_radius() / 3.f;
+					float padding = _navigator->get_loiter_radius();
 
 					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &temp_lat, &temp_lon);
-					waypoint_from_heading_and_distance(temp_lat, temp_lon, perpend_angle, _navigator->get_loiter_radius() - 20.f, &curr_sp1->lat, &curr_sp1->lon);
+					waypoint_from_heading_and_distance(temp_lat, temp_lon, perpend_angle, _navigator->get_loiter_radius() - 10.f, &curr_sp1->lat, &curr_sp1->lon);
 
 					_navigator->set_position_setpoint_triplet_updated();
 				}
