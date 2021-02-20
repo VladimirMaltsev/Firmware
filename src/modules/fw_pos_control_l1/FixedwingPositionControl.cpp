@@ -1337,6 +1337,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
             if (!_vehicle_land_detected.landed) {
                 release_parachute();
+                parachute_released = true;
                 // set_mode();
                 // set_arm(false);
             }
@@ -1480,7 +1481,8 @@ FixedwingPositionControl::release_parachute(){
     } else {
         act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
     }
-    mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Parachute released");
+    if (!parachute_released)
+        mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Parachute released");
 }
 
 void
