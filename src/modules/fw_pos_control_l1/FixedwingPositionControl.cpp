@@ -1455,6 +1455,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         engine_enable(false);
         if (hrt_elapsed_time(&unexp_desc_time) > 1e6) {
             release_parachute();
+            parachute_released = true;
 
             if (!_vehicle_land_detected.landed){
                 release_buffer();
@@ -1685,7 +1686,8 @@ FixedwingPositionControl::release_parachute(){
     } else {
         act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
     }
-    mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Released");
+    if (!parachute_released)
+        mavlink_log_critical(&_mavlink_log_pub, " [Parachute] Released");
 }
 
 void
