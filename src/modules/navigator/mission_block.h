@@ -134,8 +134,12 @@ protected:
 
 	bool _curr_checked{false};
 	bool _needing_loiter{false};
+	bool _after_loiter{false};
+	bool _spec_tack{false};
+
 	int8_t _loiter_direction{1};
 	float _loiter_threshold{0.0f};
+	float _rotation_angle{0.f};
 
 	orb_advert_t	_mavlink_log_pub{nullptr};
 	orb_advert_t    _actuator_pub{nullptr};
