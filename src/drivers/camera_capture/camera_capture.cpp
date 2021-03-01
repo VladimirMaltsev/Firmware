@@ -54,6 +54,8 @@ CameraCapture::CameraCapture() :
 	_trigger_pub(nullptr),
 	_command_ack_pub(nullptr),
 	_command_sub(-1),
+	_trig_sec_sub(-1),
+	_trigger_enabled(false),
 	_trig_buffer(nullptr),
 	_camera_capture_mode(0),
 	_camera_capture_edge(0),
@@ -93,6 +95,10 @@ void
 CameraCapture::capture_callback(uint32_t chan_index,
 				hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
 {
+	if ((edge_time - _trigger.edge_time) < uint64_t(1000 * 500)) {
+		_trigger.edge_time = edge_time;
+		return;
+	}
 
 	_trigger.chan_index = chan_index;
 	_trigger.edge_time = edge_time;
@@ -179,6 +185,21 @@ CameraCapture::publish_trigger()
 	// 	_capture_seq--;
 	// 	return;
 	// }
+	if (!_trigger_enabled) {
+		if (_trig_sec_sub < 0) {
+			_trig_sec_sub = orb_subscribe(ORB_ID(camera_trigger_secondary));
+		}
+		bool updated = false;
+		orb_check(_trig_sec_sub, &updated);
+		// Command handling
+		if (updated) {
+			camera_trigger_s cts;
+			orb_copy(ORB_ID(camera_trigger_secondary), _trig_sec_sub, &cts);
+			if (cts.seq > 0) {
+				_trigger_enabled = true;
+			} else {return;}
+		} else {return;}
+	}
 
 	if (_trigger_pub == nullptr) {
 
@@ -276,7 +297,7 @@ CameraCapture::set_capture_control(bool enabled)
 
 	int fd = -1;
 
-	fd = ::open(PX4FMU_DEVICE_PATH, O_RDWR);
+	fd = open(PX4FMU_DEVICE_PATH, O_RDWR);
 
 	if (fd < 0) {
 		PX4_ERR("open fail");

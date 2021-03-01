@@ -55,7 +55,8 @@ CameraFeedback::CameraFeedback() :
 	_time_sub(-1),
 	_att_sub(-1),
 	_capture_pub(nullptr),
-	_camera_capture_feedback(false)
+	_camera_capture_feedback(false),
+	_cap_seq(1)
 {
 
 	// Parameters
@@ -177,12 +178,12 @@ CameraFeedback::task_main()
 				orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att);
 
 
-			// if (trig.timestamp == 0 ||
-			//     gpos.timestamp == 0 ||
-			//     att.timestamp == 0) {
-			// 	// reject until we have valid data
-			// 	continue;
-			// }
+			if (trig.timestamp == 0 ||
+			    //gpos.timestamp == 0 ||
+			    att.timestamp == 0) {
+				// reject until we have valid data
+				continue;
+			}
 
 			struct camera_capture_s capture = {};
 
@@ -192,7 +193,7 @@ CameraFeedback::task_main()
 			capture.timestamp_utc = gps_time.time_utc_usec;
 
 			// Fill image sequence
-			capture.seq = trig.seq;
+			capture.seq = _cap_seq++;
 
 			// Fill position data
 			capture.lat = gpos.lat;

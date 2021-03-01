@@ -771,7 +771,7 @@ CameraTrigger::engage(void *arg)
 	px4_clock_gettime(CLOCK_REALTIME, &tv);
 	trigger.timestamp_utc = (uint64_t) tv.tv_sec * 1000000 + tv.tv_nsec / 1000;
 
-	trigger.seq = trig->_trigger_seq;
+	trigger.seq = ++trig->_trigger_seq;
 	trigger.feedback = false;
 
 	if (!trig->_cam_cap_fback) {

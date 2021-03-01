@@ -2249,7 +2249,7 @@ public:
 
 		//orb_copy(ORB_ID(camera_capture), _capture_sub, &curr_cap);
 		if(_capture_sub->update(&_capture_time, &curr_cap)){
-			_image_n = curr_cap.seq + 1;
+			_image_n = curr_cap.seq;
 		}
 
 		mavlink_camera_capture_status_t camera_status_msg;

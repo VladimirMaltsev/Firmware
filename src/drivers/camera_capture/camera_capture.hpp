@@ -122,6 +122,8 @@ private:
 
 	// Subscribers
 	int				_command_sub;
+	int				_trig_sec_sub;
+	bool 				_trigger_enabled;
 
 	// Trigger Buffer
 	struct _trig_s {

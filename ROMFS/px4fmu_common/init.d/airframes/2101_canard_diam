@@ -46,4 +46,4 @@ fi
 set MIXER Canard
 
 # use PWM parameters for throttle channel
-set PWM_OUT 4
+#set PWM_OUT 4

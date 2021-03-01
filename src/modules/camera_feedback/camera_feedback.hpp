@@ -103,6 +103,7 @@ private:
 	param_t			_p_camera_capture_feedback;
 
 	int32_t _camera_capture_feedback;
+	int32_t _cap_seq;
 
 	void		task_main();
 
