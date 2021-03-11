@@ -179,6 +179,13 @@ MissionBlock::is_mission_item_reached()
 				}else if (_mission_item.time_inside > 1.5f && _mission_item.time_inside < 2.5f){ //Tack enter
 					_after_loiter = true;
 
+					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp1->lat, curr_sp1->lon);
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon,
+								prev_curr_bearing, 20.f,
+								&curr_sp1->lat, &curr_sp1->lon);
+
+					_navigator->set_position_setpoint_triplet_updated();
+
 				}else if (_mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f){ //Tack exit
 					_needing_loiter = true;
 
@@ -224,39 +231,33 @@ MissionBlock::is_mission_item_reached()
 					curr_sp1->loiter_direction = _loiter_direction;
 					_after_loiter = true;
 
-					double temp_lat = 1.f;
-					double temp_lon = 1.f;
-
 					_mission_item.yaw  = get_bearing_to_next_waypoint(_mission_item.lat, _mission_item.lon, next_sp->lat, next_sp->lon);
 					float perpend_angle = wrap_pi(_mission_item.yaw + _loiter_direction * M_PI_2_F);
 
-					float padding = (fabsf(_rotation_angle) > M_PI_2_F) ? _navigator->get_loiter_radius() * fabsf(_rotation_angle /2.f)  : 20.f;
+					float padding = (fabsf(_rotation_angle) > M_PI_2_F) ? _navigator->get_loiter_radius() * 1.5f * fabsf(_rotation_angle / M_PI_F)  : 40.f;
 
-					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &temp_lat, &temp_lon);
-					waypoint_from_heading_and_distance(temp_lat, temp_lon, perpend_angle, _navigator->get_loiter_radius() - 20.f, &curr_sp1->lat, &curr_sp1->lon);
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &prev_sp->lat, &prev_sp->lon);
+					waypoint_from_heading_and_distance(prev_sp->lat, prev_sp->lon, perpend_angle, _navigator->get_loiter_radius() - 10.f, &curr_sp1->lat, &curr_sp1->lon);
 
 					_navigator->set_position_setpoint_triplet_updated();
 
 				}else if (_mission_item.time_inside > 1.5f && _mission_item.time_inside < 2.5f){ //Tack enter
 					_after_loiter = true;
 
-				}else if ((!_spec_tack || dist_xy < 30.f) && _mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f){ //Tack exit
+				}else if ((!_spec_tack || dist_xy < (_navigator->get_loiter_radius() / 3.f)) && _mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f){ //Tack exit
 
 					curr_sp1->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 					curr_sp1->loiter_radius = _navigator->get_loiter_radius();
 					curr_sp1->loiter_direction = _loiter_direction;
 					_after_loiter = true;
 
-					double temp_lat = 1.f;
-					double temp_lon = 1.f;
-
 					_mission_item.yaw  = get_bearing_to_next_waypoint(_mission_item.lat, _mission_item.lon, next_sp->lat, next_sp->lon);
 					float perpend_angle = wrap_pi(_mission_item.yaw + _loiter_direction * M_PI_2_F);
 
 					float padding = _navigator->get_loiter_radius();
 
-					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &temp_lat, &temp_lon);
-					waypoint_from_heading_and_distance(temp_lat, temp_lon, perpend_angle, _navigator->get_loiter_radius() - 10.f, &curr_sp1->lat, &curr_sp1->lon);
+					waypoint_from_heading_and_distance(_mission_item.lat, _mission_item.lon, wrap_pi(_mission_item.yaw + M_PI_F), padding, &prev_sp->lat, &prev_sp->lon);
+					waypoint_from_heading_and_distance(prev_sp->lat, prev_sp->lon, perpend_angle, _navigator->get_loiter_radius() - 10.f, &curr_sp1->lat, &curr_sp1->lon);
 
 					_navigator->set_position_setpoint_triplet_updated();
 				}
@@ -401,16 +402,21 @@ MissionBlock::is_mission_item_reached()
 
 			float radius = 1.2f *_navigator->get_loiter_radius();
 			if (_after_loiter)
-				mission_acceptance_radius = 10.f;
+				mission_acceptance_radius = 20.f;
 
 			if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
 				if (dist >= 0.0f && dist <= radius && dist_z <= _navigator->get_altitude_acceptance_radius() / 2.f) {
 					_waypoint_position_reached = true;
 				}
 			} else if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION && !_needing_loiter && dist_xy >= 0.0f && dist_xy <= mission_acceptance_radius) {
-				//mavlink_log_critical(&_mavlink_log_pub, "rad = %f", mission_acceptance_radius);
+				mavlink_log_critical(&_mavlink_log_pub, "acceptance radius = %f", mission_acceptance_radius);
+				if (_mission_item.time_inside > 1.5f && _mission_item.time_inside < 2.5f){
+					curr_sp->lat = _mission_item.lat;
+					curr_sp->lon = _mission_item.lon;
+					_navigator->set_position_setpoint_triplet_updated();
+				}
 				_waypoint_position_reached = true;
-			} else if (!_needing_loiter && dist_xy >= 0.0f && dist_xy <= _navigator->get_loiter_radius() / 2.f) {
+			} else if (!_after_loiter && !_needing_loiter && dist_xy >= 0.0f && dist_xy <= _navigator->get_loiter_radius() / 2.f) {
 				_waypoint_position_reached = true;
 			}
 		}
@@ -464,15 +470,12 @@ MissionBlock::is_mission_item_reached()
 
 			/* accept yaw if reached or if timeout is set in which case we ignore not forced headings */
 			if (((_mission_item.time_inside > 2.5f && _mission_item.time_inside < 3.5f && _loiter_direction * yaw_err > 0) || (_mission_item.time_inside > 0.5f && _mission_item.time_inside < 1.5f && _loiter_direction * yaw_err > 0)) && fabsf(yaw_err /*+ _loiter_direction * math::radians(85.f)*/) < _navigator->get_yaw_threshold()) {
-				//mavlink_log_critical(&_mavlink_log_pub, "switch back");
-				//_mission_item.yaw += math::radians(180.f);
 				curr_sp->type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 				curr_sp->lat = _mission_item.lat;
 				curr_sp->lon = _mission_item.lon;
 				_needing_loiter = false;
-				//mavlink_log_critical(&_mavlink_log_pub, "switch to position");
+				mavlink_log_critical(&_mavlink_log_pub, "switch to position");
 				_navigator->set_position_setpoint_triplet_updated();
-				//_waypoint_yaw_reached = true;
 			}
 		}else {
 			if (_mission_item.time_inside > 0.5f && _mission_item.time_inside < 1.5f && _after_loiter){
@@ -496,7 +499,7 @@ MissionBlock::is_mission_item_reached()
 		}
 
 		/* check if the MAV was long enough inside the waypoint orbit */
-		if ((get_time_inside(_mission_item) < FLT_EPSILON) ||
+		if ((get_time_inside(_mission_item) < 10.f) ||
 		    (now - _time_first_inside_orbit >= (hrt_abstime)(get_time_inside(_mission_item) * 1e6f))) {
 
 			position_setpoint_s &curr_sp = _navigator->get_position_setpoint_triplet()->current;
