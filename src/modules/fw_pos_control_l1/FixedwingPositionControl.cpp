@@ -994,13 +994,13 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
         else
             pwm_yaw = 0.0f - air_nav_angle / (float)M_PI_4 * 2;
 
-        act1.control[4] = pwm_yaw;
-        act1.timestamp = hrt_absolute_time();
-        if (act_pub1 != nullptr) {
-            orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
-        } else {
-            act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
-        }
+        // act1.control[4] = pwm_yaw;
+        // act1.timestamp = hrt_absolute_time();
+        // if (act_pub1 != nullptr) {
+        //     orb_publish(ORB_ID(actuator_controls_1), act_pub1, &act1);
+        // } else {
+        //     act_pub1 = orb_advertise(ORB_ID(actuator_controls_1), &act1);
+        // }
     }
 
     /* no throttle limit as default */
