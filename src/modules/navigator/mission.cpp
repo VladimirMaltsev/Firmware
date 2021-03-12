@@ -580,6 +580,7 @@ Mission::set_mission_items()
 	_needing_loiter = false;
 	_is_reached = false;
 	_after_loiter = false;
+	_spec_tack = false;
 
 	/* the home dist check provides user feedback, so we initialize it to this */
 	bool user_feedback_done = false;

@@ -141,9 +141,6 @@ protected:
 	float _loiter_threshold{0.0f};
 	float _rotation_angle{0.f};
 
-	double true_lat{0};
-	double true_lon{0};
-
 	orb_advert_t	_mavlink_log_pub{nullptr};
 	orb_advert_t    _actuator_pub{nullptr};
 };
