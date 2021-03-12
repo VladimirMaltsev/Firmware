@@ -163,6 +163,7 @@ MissionBlock::is_mission_item_reached()
 				if ((_mission_item.time_inside > 0.5f &&  _mission_item.time_inside < 1.5f) || (prev_sp->valid && fabs(altitude_amsl - prev_sp->alt) > _navigator->get_altitude_acceptance_radius())){ //Rotation around point
 
 					_needing_loiter = true;
+					_mission_item.time_inside = 1.f;
 
 					float prev_curr_bearing = get_bearing_to_next_waypoint(prev_sp->lat, prev_sp->lon, curr_sp1->lat, curr_sp1->lon);
 					float curr_next_bearing = get_bearing_to_next_waypoint(curr_sp1->lat, curr_sp1->lon, next_sp->lat, next_sp->lon);
@@ -398,7 +399,7 @@ MissionBlock::is_mission_item_reached()
 			}
 
 			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
-			struct position_setpoint_s *prev_sp = &_navigator->get_position_setpoint_triplet()->previous;
+			//struct position_setpoint_s *prev_sp = &_navigator->get_position_setpoint_triplet()->previous;
 
 			float radius = 1.2f *_navigator->get_loiter_radius();
 			if (_after_loiter)
@@ -445,7 +446,7 @@ MissionBlock::is_mission_item_reached()
 			float yaw_err = wrap_pi(_mission_item.yaw - cog);
 
 			/* accept yaw if reached or if timeout is set in which case we ignore not forced headings */
-			if (fabsf(yaw_err) < math::radians(_navigator->get_yaw_threshold())
+			if (fabsf(yaw_err) < _navigator->get_yaw_threshold()
 			    || (_navigator->get_yaw_timeout() >= FLT_EPSILON && !_mission_item.force_heading)) {
 
 				_waypoint_yaw_reached = true;
@@ -533,6 +534,8 @@ MissionBlock::is_mission_item_reached()
 			}
 			_curr_checked = false;
 			_needing_loiter = false;
+			_after_loiter = false;
+			_spec_tack = false;
 			return true;
 		}
 	}
