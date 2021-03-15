@@ -792,7 +792,7 @@ FixedwingPositionControl::update_desired_altitude(float dt) {
      */
 
     if (fabsf(_althold_epv - _global_pos.epv) > ALTHOLD_EPV_RESET_THRESH) {
-        _hold_alt = _global_pos.alt;
+        //_hold_alt = _global_pos.alt;
         _althold_epv = _global_pos.epv;
     }
 
@@ -804,7 +804,7 @@ FixedwingPositionControl::update_desired_altitude(float dt) {
     if (_manual.x > deadBand) {
         _hold_alt = _manual.x;
     } else {
-        _hold_alt = _global_pos.alt;
+        //_hold_alt = _global_pos.alt;
         _althold_epv = _global_pos.epv;
     }
 
